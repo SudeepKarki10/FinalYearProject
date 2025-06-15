@@ -1,75 +1,249 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import React, { useEffect } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { TrekCard } from "../../components/TrekCard";
+import { colors } from "../../constants/Colors";
+import { useTrekStore } from "../../store/trek-store";
+import type { Trek } from "../../types";
 
 export default function HomeScreen() {
+  const { 
+    featuredTreks, 
+    popularTreks, 
+    loading, 
+    error, 
+    fetchTreks 
+  } = useTrekStore();
+
+  useEffect(() => {
+    fetchTreks();
+  }, [fetchTreks]);
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Error', error);
+    }
+  }, [error]);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={styles.logoImage}
+            />
+            <Text style={styles.logoText}>Nepal Trek Explorer</Text>
+          </View>
+          <TouchableOpacity style={styles.notificationButton}>
+            <Text style={styles.notificationIcon}>🔔</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <Text style={styles.searchPlaceholder}>
+              Search treks, districts, or attractions...
+            </Text>
+          </View>
+        </View>
+
+        {/* Featured Treks */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Featured Treks</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.featuredContainer}
+            >
+              {featuredTreks.map((trek: Trek) => (
+                <TrekCard
+                  key={trek.id}
+                  trek={trek}
+                  compact={true}
+                />
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Explore by Category */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Explore by Category</Text>
+          <View style={styles.categoriesContainer}>
+            <TouchableOpacity style={styles.categoryCard}>
+              <View style={[styles.categoryIcon, { backgroundColor: '#e1f5fe' }]}>
+                <Text style={styles.categoryIconText}>🏔️</Text>
+              </View>
+              <Text style={styles.categoryName}>Treks</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.categoryCard}>
+              <View style={[styles.categoryIcon, { backgroundColor: '#fff3e0' }]}>
+                <Text style={styles.categoryIconText}>🗺️</Text>
+              </View>
+              <Text style={styles.categoryName}>Districts</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.categoryCard}>
+              <View style={[styles.categoryIcon, { backgroundColor: '#e8f5e9' }]}>
+                <Text style={styles.categoryIconText}>🏞️</Text>
+              </View>
+              <Text style={styles.categoryName}>Attractions</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Popular Treks */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Popular Treks</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <View style={styles.popularContainer}>
+              {popularTreks.map((trek: Trek) => (
+                <View key={trek.id} style={styles.popularCard}>
+                  <TrekCard trek={trek} />
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  stepContainer: {
-    gap: 8,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  logoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  logoImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: colors.text,
+  },
+  notificationButton: {
+    padding: 8,
+  },
+  notificationIcon: {
+    fontSize: 20,
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    marginRight: 8,
+    color: colors.textSecondary,
+  },
+  searchPlaceholder: {
+    color: colors.textSecondary,
+  },
+  section: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: colors.text,
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    paddingVertical: 32,
+    alignItems: "center",
+  },
+  featuredContainer: {
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingBottom: 8,
+    gap: 12,
+  },
+  categoriesContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    gap: 12,
+  },
+  categoryCard: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+  },
+  categoryIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  categoryIconText: {
+    fontSize: 20,
+  },
+  categoryName: {
+    fontSize: 14,
+    color: colors.text,
+  },
+  popularContainer: {
+    gap: 12,
+  },
+  popularCard: {
+    marginBottom: 12,
   },
 });
