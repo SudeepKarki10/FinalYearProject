@@ -1,14 +1,17 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/Colors';
 import { UserInterests, useAuthStore } from '../store/auth-store';
+import { useTrekStore } from '../store/trek-store';
 
 interface InterestCategory {
   id: string;
@@ -58,8 +61,24 @@ const INTEREST_CATEGORIES: InterestCategory[] = [
 
 export default function OnboardingForm() {
   const { updateUserInterests } = useAuthStore();
+  const { recommendedTreks, fetchRecommendedTreks } = useTrekStore();
   const [selectedInterests, setSelectedInterests] = useState<UserInterests>([]);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+
+  useEffect(() => {
+    const loadRecommendedTreks = async () => {
+      try {
+        await fetchRecommendedTreks();
+      } catch (error) {
+        console.error('Error fetching recommended treks:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadRecommendedTreks();
+  }, [fetchRecommendedTreks]);
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests(prev => {
@@ -133,11 +152,43 @@ export default function OnboardingForm() {
     </View>
   );
 
+const handleSkip = () => {
+        try {
+          console.log('Skipping onboarding...');
+          replace('/profile');
+        } catch (navError) {
+          console.error('Navigation error:', navError);
+          setIsNavigating(false);
+        }
+};
+
+
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Help us personalize your experience</Text>
-        <Text style={styles.subtitle}>What kind of treks are you interested in?</Text>
+        <View style={styles.headerContent}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Help us personalize your experience</Text>
+            <Text style={styles.subtitle}>What kind of treks are you interested in?</Text>
+          </View>
+        
+{isLoading ? (
+  <ActivityIndicator style={{ marginTop: 8 }} color={colors.primary} />
+) : recommendedTreks.length > 0 ? (
+  // This correctly renders the button only if recommendations exist
+  <TouchableOpacity 
+    style={styles.skipButton} 
+    onPress={handleSkip}
+    activeOpacity={0.7}
+    disabled={isNavigating}
+  >
+    <Text style={styles.skipButtonText}>
+      {isNavigating ? 'Skipping...' : 'Skip'}
+    </Text>
+  </TouchableOpacity>
+) : null}
+        </View>
       </View>
 
       <ScrollView 
@@ -166,7 +217,7 @@ export default function OnboardingForm() {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -177,13 +228,48 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    paddingBottom: 0,
+    paddingBottom: 8,
+    paddingTop: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    width: '100%',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 8,
+    flex: 1,
+    paddingRight: 16, // Add space for the skip button
+  },
+  skipButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    marginLeft: 8,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    zIndex: 1,
+  },
+  skipButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '700',
   },
   subtitle: {
     fontSize: 16,
