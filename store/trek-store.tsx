@@ -111,7 +111,7 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
       const data: Trek[] = await response.json();
       
       // Take the first 3 treks as recommended (or slice if less than 3)
-      const recommendations = data.slice(0, Math.min(3, data.length));
+      const recommendations = data;
       set({ recommendedTreks: recommendations });
     } catch (error) {
       console.error('Error fetching recommended treks:', error);
@@ -134,8 +134,10 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
       }
       
       const data = await response.json();
-      const favoriteIds = new Set<number>(data.map((trek: Trek) => trek.id));
+      console.log('Fetched favorites data:', data);
+      const favoriteIds = new Set<number>(data.map((fav: { trek: number }) => fav.trek));
       const favoriteTreks = data;
+      console.log('Mapped favorite trek IDs:', Array.from(favoriteIds));
       set({ favoriteIds, favoriteTreks });
     } catch (error) {
       console.error('Error fetching favorites:', error);
@@ -146,11 +148,62 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
   toggleFavorite: async (trekId: number) => {
     try {
       const headers = await getAuthHeaders();
-      const method = get().favoriteIds.has(trekId) ? 'DELETE' : 'POST';
-      const response = await fetch(`http://192.168.0.101:8000/api/favorites/${trekId}/`, {
-        method,
-        headers
-      });
+      const isFavorited = get().favoriteIds.has(trekId);
+      
+      // Get user from auth store
+      const authStore = (await import('./auth-store')).useAuthStore.getState();
+      const user = authStore.user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      const userId = user.user?.id || user.id;
+
+      let response;
+      if (isFavorited) {
+        console.log('Attempting to remove favorite for trek:', trekId);
+        // First get the favorite ID
+        const favResponse = await fetch(`http://192.168.0.101:8000/api/favorites/`, {
+          headers
+        });
+        
+        if (!favResponse.ok) {
+          throw new Error(`HTTP error! status: ${favResponse.status}`);
+        }
+        
+        const favorites = await favResponse.json();
+        console.log('All favorites:', favorites);
+        
+        const favorite = favorites.find(
+          (f: { trek: number; id: number }) => f.trek === trekId
+        );
+        
+        if (!favorite) {
+          console.log('No favorite found for trek:', trekId);
+          throw new Error('Favorite not found');
+        }
+
+        console.log('Favorite found:', favorite.id, 'for trek:', favorite.trek);
+        
+        if (!favorite) {
+          throw new Error('Favorite not found');
+        }
+
+        // DELETE request with the favorite ID
+        response = await fetch(`http://192.168.0.101:8000/api/favorites/${favorite.id}/`, {
+          method: 'DELETE',
+          headers
+        });
+      } else {
+        // POST request
+        response = await fetch(`http://192.168.0.101:8000/api/favorites/`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            user: userId,
+            trek: trekId
+          })
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -158,14 +211,14 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
 
       // Update local state optimistically
       const favoriteIds = new Set(get().favoriteIds);
-      if (method === 'DELETE') {
+      if (isFavorited) {
         favoriteIds.delete(trekId);
       } else {
         favoriteIds.add(trekId);
       }
 
       // Update favorite treks array
-      const favoriteTreks = method === 'DELETE'
+      const favoriteTreks = isFavorited
         ? get().favoriteTreks.filter(trek => trek.id !== trekId)
         : [...get().favoriteTreks, get().treks.find(trek => trek.id === trekId)!];
 
@@ -177,6 +230,7 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
   },
 
   isFavorite: (trekId: number) => {
+    console.log('Checking if trek is favorite:', trekId, 'Current favoriteIds:', Array.from(get().favoriteIds));
     return get().favoriteIds.has(trekId);
   },
 
