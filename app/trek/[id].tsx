@@ -1,4 +1,5 @@
 import { ThemedText } from '@/components/ThemedText';
+import { useTrekStore } from '@/store/trek-store';
 import { useTrekDetailStore } from '@/store/trek-store-single';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
@@ -25,6 +26,7 @@ const getDifficultyColor = (difficulty: string) => {
 export default function TrekDetailsPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentTrek, loading, error, fetchTrekById, clearCurrentTrek } = useTrekDetailStore();
+  const { toggleFavorite, isFavorite } = useTrekStore();
   const [activeTab, setActiveTab] = useState('Overview');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -39,6 +41,12 @@ export default function TrekDetailsPage() {
       clearCurrentTrek();
     };
   }, [id, fetchTrekById, clearCurrentTrek]);
+
+  const handleFavoritePress = async () => {
+    if (currentTrek) {
+      await toggleFavorite(currentTrek.id);
+    }
+  };
 
   const renderImageSlider = () => {
     if (!currentTrek?.photos?.length) return null;
@@ -60,8 +68,18 @@ export default function TrekDetailsPage() {
           keyExtractor={(item, index) => index.toString()}
         />
         <View style={styles.headerOverlay} />
-        <TouchableOpacity style={styles.favoriteButton}>
-          <Ionicons name="heart-outline" size={24} color="white" />
+        <TouchableOpacity 
+          style={[
+            styles.favoriteButton,
+            isFavorite(currentTrek.id) && styles.favoriteButtonActive
+          ]}
+          onPress={handleFavoritePress}
+        >
+          <Ionicons 
+            name={isFavorite(currentTrek.id) ? "heart" : "heart-outline"} 
+            size={24} 
+            color={isFavorite(currentTrek.id) ? "#FF4B4B" : "white"} 
+          />
         </TouchableOpacity>
         
         {/* Image indicators */}
@@ -93,7 +111,7 @@ export default function TrekDetailsPage() {
             
             <View style={styles.infoGrid}>
               <View style={styles.infoItem}>
-                <Ionicons name="mountain-outline" size={20} color="#4A90E2" />
+                <Ionicons name="triangle-outline" size={20} color="#4A90E2" />
                 <View style={styles.infoTextContainer}>
                   <ThemedText style={styles.infoLabel}>Max Elevation</ThemedText>
                   <ThemedText style={styles.infoValue}>
@@ -328,6 +346,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backdropFilter: 'blur(10px)',
+  },
+  favoriteButtonActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   imageIndicators: {
     position: 'absolute',
