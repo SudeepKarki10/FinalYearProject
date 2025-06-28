@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
 import {
-  Dimensions,
   Image,
   SafeAreaView,
   ScrollView,
@@ -11,18 +10,21 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { colors } from "../constants/Colors";
-import { useTrekStore } from "../store/trek-store";
-
-const { width } = Dimensions.get('window');
+import { colors } from "../../constants/Colors";
+import { useTrekStore } from "../../store/trek-store";
 
 export default function FavoritesScreen() {
   const router = useRouter();
-  const { favoriteTreks, fetchFavorites } = useTrekStore();
+  const { favoriteTreks, fetchFavorites, fetchTreks } = useTrekStore();
 
   useEffect(() => {
-    fetchFavorites();
-  }, [fetchFavorites]);
+    // First fetch all treks, then fetch favorites
+    const loadData = async () => {
+      await fetchTreks();
+      await fetchFavorites();
+    };
+    loadData();
+  }, [fetchTreks, fetchFavorites]);
 
   const handleTrekPress = (trekId: number) => {
     router.push(`/trek/${trekId}`);
@@ -30,14 +32,9 @@ export default function FavoritesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Stack.Screen
-        options={{
-          headerTitle: "My Favorites",
-          headerTitleStyle: styles.headerTitle,
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: colors.background },
-        }}
-      />
+      <View style={styles.header}>
+        <Text style={styles.headerText}>My Favorites</Text>
+      </View>
 
       <ScrollView 
         style={styles.scrollView}
@@ -104,10 +101,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.black,
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+    backgroundColor: colors.background,
+  },
+  headerText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: colors.text,
   },
   scrollView: {
     flex: 1,

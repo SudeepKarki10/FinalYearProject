@@ -124,20 +124,36 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
 
   fetchFavorites: async () => {
     try {
+      // Get authentication headers for the logged-in user
       const headers = await getAuthHeaders();
-      const response = await fetch(`http://192.168.0.101:8000/api/favorites/`, {
-        headers
-      });
+      const response = await fetch(`http://192.168.0.101:8000/api/favorites/`, { headers });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json();
-      console.log('Fetched favorites data:', data);
-      const favoriteIds = new Set<number>(data.map((fav: { trek: number }) => fav.trek));
-      const favoriteTreks = data;
+      // This gets the favorites data: [{ id, trek, user }, ...]
+      const favoritesData = await response.json();
+      console.log('Fetched favorites data:', favoritesData);
+
+      // Create a Set of trek IDs from the favorites data
+      const favoriteIds = new Set<number>(favoritesData.map((fav: { trek: number }) => fav.trek));
       console.log('Mapped favorite trek IDs:', Array.from(favoriteIds));
+
+      // Get the full list of all treks from the store's state
+      const allTreks = get().treks;
+      
+      // If treks haven't been fetched yet, fetch them first
+      if (allTreks.length === 0) {
+        console.log('Fetching treks before mapping favorites...');
+        await get().fetchTreks();
+      }
+
+      // Filter the full list of treks to get only the favorited ones
+      const favoriteTreks = get().treks.filter(trek => favoriteIds.has(trek.id));
+      console.log('Mapped favorite treks:', favoriteTreks);
+      
+      // Set both the IDs and the full trek objects
       set({ favoriteIds, favoriteTreks });
     } catch (error) {
       console.error('Error fetching favorites:', error);
