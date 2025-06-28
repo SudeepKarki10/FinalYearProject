@@ -1,735 +1,496 @@
-// import { useLocalSearchParams, useRouter } from "expo-router";
-// import React, { useEffect, useState } from "react";
-// import {
-//     ActivityIndicator,
-//     Alert,
-//     Dimensions,
-//     Image,
-//     SafeAreaView,
-//     ScrollView,
-//     StyleSheet,
-//     Text,
-//     TouchableOpacity,
-//     View,
-// } from "react-native";
-// import { colors } from "../../constants/Colors";
-// import { useAuthStore } from "../../store/auth-store";
-// import { useTrekStore } from "../../store/trek-store";
+import { ThemedText } from '@/components/ThemedText';
+import { useTrekDetailStore } from '@/store/trek-store-single';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
-// const { width } = Dimensions.get("window");
+const { width } = Dimensions.get('window');
 
-// export default function TrekDetailScreen() {
-//   const { id } = useLocalSearchParams<{ id: string }>();
-//   const router = useRouter();
-//   const { currentTrek, loading, error, fetchTrekById, toggleFavorite, isFavorite } = useTrekStore();
-//   const { user, isAuthenticated } = useAuthStore();
-//   const [activeTab, setActiveTab] = useState("overview");
-//   const [activeImageIndex, setActiveImageIndex] = useState(0);
-//   const [favorite, setFavorite] = useState(false);
+// Helper function for difficulty badge colors
+const getDifficultyColor = (difficulty: string) => {
+  switch (difficulty.toLowerCase()) {
+    case 'easy':
+      return { backgroundColor: '#4CAF50' };
+    case 'moderate':
+      return { backgroundColor: '#FF9800' };
+    case 'challenging':
+    case 'difficult':
+      return { backgroundColor: '#F44336' };
+    default:
+      return { backgroundColor: '#2196F3' };
+  }
+};
 
-//   useEffect(() => {
-//     if (id) {
-//       fetchTrekById(Number(id));
-//     }
-//   }, [id, fetchTrekById]);
+export default function TrekDetailsPage() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { currentTrek, loading, error, fetchTrekById, clearCurrentTrek } = useTrekDetailStore();
+  const [activeTab, setActiveTab] = useState('Overview');
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-//   useEffect(() => {
-//     if (currentTrek) {
-//       const isTrekFavorite = isFavorite(currentTrek.id);
-//       setFavorite(isTrekFavorite);
-//     }
-//   }, [currentTrek, user?.savedTreks, isAuthenticated]);
+  const tabs = ['Overview', 'Itinerary', 'Costs', 'Gear'];
 
-//   useEffect(() => {
-//     if (error) {
-//       Alert.alert("Error", error);
-//     }
-//   }, [error]);
+  useEffect(() => {
+    if (id) {
+      fetchTrekById(Number(id));
+    }
 
-//   const handleToggleFavorite = async () => {
-//     if (!currentTrek) return;
-    
-//     try {
-//       setFavorite(!favorite);
-//       toggleFavorite(currentTrek.id);
-//     } catch (error) {
-//       setFavorite(favorite);
-//       Alert.alert("Error", "Failed to update favorites. Please try again.");
-//     }
-//   };
+    return () => {
+      clearCurrentTrek();
+    };
+  }, [id, fetchTrekById, clearCurrentTrek]);
 
-//   const getDifficultyColor = (difficulty: string) => {
-//     switch (difficulty.toLowerCase()) {
-//       case "easy":
-//         return colors.difficulty?.easy || "#4CAF50";
-//       case "moderate":
-//         return colors.difficulty?.moderate || "#FF9800";
-//       case "challenging":
-//         return colors.difficulty?.challenging || "#F44336";
-//       case "extreme":
-//         return colors.difficulty?.extreme || "#9C27B0";
-//       default:
-//         return colors.difficulty?.moderate || "#FF9800";
-//     }
-//   };
+  const renderImageSlider = () => {
+    if (!currentTrek?.photos?.length) return null;
 
-//   const renderTabContent = () => {
-//     if (!currentTrek) return null;
+    return (
+      <View style={styles.imageSliderContainer}>
+        <FlatList
+          data={currentTrek.photos}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(event) => {
+            const index = Math.round(event.nativeEvent.contentOffset.x / width);
+            setCurrentImageIndex(index);
+          }}
+          renderItem={({ item }) => (
+            <Image source={{ uri: item }} style={styles.headerImage} />
+          )}
+          keyExtractor={(item, index) => index.toString()}
+        />
+        <View style={styles.headerOverlay} />
+        <TouchableOpacity style={styles.favoriteButton}>
+          <Ionicons name="heart-outline" size={24} color="white" />
+        </TouchableOpacity>
+        
+        {/* Image indicators */}
+        <View style={styles.imageIndicators}>
+          {currentTrek.photos.map((_, index) => (
+            <View
+              key={index}
+              style={[
+                styles.indicator,
+                { opacity: index === currentImageIndex ? 1 : 0.5 }
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+    );
+  };
 
-//     switch (activeTab) {
-//       case "overview":
-//         return (
-//           <View>
-//             <Text style={styles.description}>{currentTrek.description}</Text>
+  const renderTabContent = () => {
+    if (!currentTrek) return null;
 
-//             <View style={styles.infoSection}>
-//               <View style={styles.infoRow}>
-//                 <View style={styles.infoItem}>
-//                   <Text style={styles.infoIcon}>🏔️</Text>
-//                   <View style={styles.infoTextContainer}>
-//                     <Text style={styles.infoLabel}>Max Elevation</Text>
-//                     <Text style={styles.infoValue}>
-//                       {currentTrek.elevation_profile.max_elevation}
-//                     </Text>
-//                   </View>
-//                 </View>
-//                 <View style={styles.infoItem}>
-//                   <Text style={styles.infoIcon}>⏱️</Text>
-//                   <View style={styles.infoTextContainer}>
-//                     <Text style={styles.infoLabel}>Duration</Text>
-//                     <Text style={styles.infoValue}>{currentTrek.duration}</Text>
-//                   </View>
-//                 </View>
-//               </View>
+    switch (activeTab) {
+      case 'Overview':
+        return (
+          <View style={styles.tabContent}>
+            <ThemedText style={styles.description}>
+              {currentTrek.description}
+            </ThemedText>
+            
+            <View style={styles.infoGrid}>
+              <View style={styles.infoItem}>
+                <Ionicons name="mountain-outline" size={20} color="#4A90E2" />
+                <View style={styles.infoTextContainer}>
+                  <ThemedText style={styles.infoLabel}>Max Elevation</ThemedText>
+                  <ThemedText style={styles.infoValue}>
+                    {currentTrek.elevation_profile.max_elevation}
+                  </ThemedText>
+                </View>
+              </View>
 
-//               <View style={styles.infoRow}>
-//                 <View style={styles.infoItem}>
-//                   <Text style={styles.infoIcon}>📅</Text>
-//                   <View style={styles.infoTextContainer}>
-//                     <Text style={styles.infoLabel}>Best Seasons</Text>
-//                     <Text style={styles.infoValue}>
-//                       {currentTrek.best_seasons.join(", ")}
-//                     </Text>
-//                   </View>
-//                 </View>
-//                 <View style={styles.infoItem}>
-//                   <Text style={styles.infoIcon}>📍</Text>
-//                   <View style={styles.infoTextContainer}>
-//                     <Text style={styles.infoLabel}>Region</Text>
-//                     <Text style={styles.infoValue}>{currentTrek.region}</Text>
-//                   </View>
-//                 </View>
-//               </View>
-//             </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="time-outline" size={20} color="#4A90E2" />
+                <View style={styles.infoTextContainer}>
+                  <ThemedText style={styles.infoLabel}>Duration</ThemedText>
+                  <ThemedText style={styles.infoValue}>{currentTrek.duration}</ThemedText>
+                </View>
+              </View>
 
-//             <View style={styles.section}>
-//               <Text style={styles.sectionTitle}>Historical Significance</Text>
-//               <Text style={styles.sectionText}>
-//                 {currentTrek.historical_significance}
-//               </Text>
-//             </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="calendar-outline" size={20} color="#4A90E2" />
+                <View style={styles.infoTextContainer}>
+                  <ThemedText style={styles.infoLabel}>Best Seasons</ThemedText>
+                  <ThemedText style={styles.infoValue}>
+                    {currentTrek.best_seasons?.join(', ')}
+                  </ThemedText>
+                </View>
+              </View>
 
-//             <View style={styles.section}>
-//               <Text style={styles.sectionTitle}>Nearby Attractions</Text>
-//               <View style={styles.tagContainer}>
-//                 {currentTrek.nearby_attractions.map((attraction, index) => (
-//                   <View key={index} style={styles.tag}>
-//                     <Text style={styles.tagText}>{attraction}</Text>
-//                   </View>
-//                 ))}
-//               </View>
-//             </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="location-outline" size={20} color="#4A90E2" />
+                <View style={styles.infoTextContainer}>
+                  <ThemedText style={styles.infoLabel}>Region</ThemedText>
+                  <ThemedText style={styles.infoValue}>
+                    {currentTrek.region}
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          </View>
+        );
 
-//             <View style={styles.section}>
-//               <Text style={styles.sectionTitle}>Safety Information</Text>
-//               <View style={styles.safetyContainer}>
-//                 <Text style={styles.safetyIcon}>⚠️</Text>
-//                 <Text style={styles.safetyText}>
-//                   Altitude Sickness Risk:{" "}
-//                   {currentTrek.safety_info.altitude_sickness_risk}
-//                 </Text>
-//               </View>
-//             </View>
-//           </View>
-//         );
+      case 'Itinerary':
+        return (
+          <View style={styles.tabContent}>
+            {currentTrek.itinerary.map((item, index) => (
+              <View key={index} style={styles.itineraryListItem}>
+                <View style={styles.dayDot}>
+                  <ThemedText style={styles.dayNumber}>{index + 1}</ThemedText>
+                </View>
+                <ThemedText style={styles.itineraryText}>{item}</ThemedText>
+              </View>
+            ))}
+          </View>
+        );
 
-//       case "itinerary":
-//         return (
-//           <View style={styles.itineraryContainer}>
-//             {currentTrek.itinerary.map((day, index) => (
-//               <View key={index} style={styles.itineraryItem}>
-//                 <View style={styles.itineraryDot} />
-//                 <View style={styles.itineraryContent}>
-//                   <Text style={styles.itineraryDay}>{day}</Text>
-//                 </View>
-//               </View>
-//             ))}
-//           </View>
-//         );
+      case 'Costs':
+        return (
+          <View style={styles.tabContent}>
+            {currentTrek.cost_breakdown && (
+              <>
+                <View style={styles.costItem}>
+                  <ThemedText style={styles.costLabel}>Permits</ThemedText>
+                  <ThemedText style={styles.costValue}>
+                    {currentTrek.cost_breakdown.permits}
+                  </ThemedText>
+                </View>
+                
+                <View style={styles.costItem}>
+                  <ThemedText style={styles.costLabel}>Guide</ThemedText>
+                  <ThemedText style={styles.costValue}>
+                    {currentTrek.cost_breakdown.guide}
+                  </ThemedText>
+                </View>
+                
+                <View style={styles.costItem}>
+                  <ThemedText style={styles.costLabel}>Porter</ThemedText>
+                  <ThemedText style={styles.costValue}>
+                    {currentTrek.cost_breakdown.porter}
+                  </ThemedText>
+                </View>
+                
+                <View style={styles.costItem}>
+                  <ThemedText style={styles.costLabel}>Accommodation</ThemedText>
+                  <ThemedText style={styles.costValue}>
+                    {currentTrek.cost_breakdown.accommodation}
+                  </ThemedText>
+                </View>
+                
+                <View style={styles.costItem}>
+                  <ThemedText style={styles.costLabel}>Food</ThemedText>
+                  <ThemedText style={styles.costValue}>
+                    {currentTrek.cost_breakdown.food}
+                  </ThemedText>
+                </View>
+              </>
+            )}
+            
+            {currentTrek.transportation && (
+              <View style={styles.costItem}>
+                <ThemedText style={styles.costLabel}>Transportation</ThemedText>
+                <ThemedText style={styles.costValue}>
+                  {currentTrek.transportation}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        );
 
-//       case "costs":
-//         return (
-//           <View>
-//             <View style={styles.costSection}>
-//               <Text style={styles.costTitle}>Permits</Text>
-//               <Text style={styles.costText}>{currentTrek.cost_breakdown.permits}</Text>
-//             </View>
+      case 'Gear':
+        return (
+          <View style={styles.tabContent}>
+            <ThemedText style={styles.gearTitle}>
+              Essential gear for the {currentTrek.name}:
+            </ThemedText>
+            {currentTrek.recommended_gear?.map((item, index) => (
+              <View key={index} style={styles.gearItem}>
+                <View style={styles.gearDot} />
+                <ThemedText style={styles.gearText}>{item}</ThemedText>
+              </View>
+            ))}
+          </View>
+        );
 
-//             <View style={styles.costSection}>
-//               <Text style={styles.costTitle}>Guide</Text>
-//               <Text style={styles.costText}>{currentTrek.cost_breakdown.guide}</Text>
-//             </View>
+      default:
+        return null;
+    }
+  };
 
-//             <View style={styles.costSection}>
-//               <Text style={styles.costTitle}>Porter</Text>
-//               <Text style={styles.costText}>{currentTrek.cost_breakdown.porter}</Text>
-//             </View>
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4A90E2" />
+      </View>
+    );
+  }
 
-//             <View style={styles.costSection}>
-//               <Text style={styles.costTitle}>Accommodation</Text>
-//               <Text style={styles.costText}>
-//                 {currentTrek.cost_breakdown.accommodation}
-//               </Text>
-//             </View>
+  if (error || !currentTrek) {
+    return (
+      <View style={styles.centered}>
+        <ThemedText>Error loading trek: {error}</ThemedText>
+      </View>
+    );
+  }
 
-//             <View style={styles.costSection}>
-//               <Text style={styles.costTitle}>Food</Text>
-//               <Text style={styles.costText}>{currentTrek.cost_breakdown.food}</Text>
-//             </View>
+  return (
+    <>
+      <Stack.Screen options={{ title: 'Trek Details' }} />
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Header Image Slider */}
+        {renderImageSlider()}
 
-//             <View style={styles.costSection}>
-//               <Text style={styles.costTitle}>Transportation</Text>
-//               <Text style={styles.costText}>{currentTrek.transportation}</Text>
-//             </View>
+        {/* Trek Info Header */}
+        <View style={styles.headerInfo}>
+          <ThemedText style={styles.trekTitle}>{currentTrek.name}</ThemedText>
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={16} color="#666" />
+            <ThemedText style={styles.locationText}>
+              {currentTrek.district}, {currentTrek.region}
+            </ThemedText>
+          </View>
+          <View style={[styles.difficultyBadge, getDifficultyColor(currentTrek.difficulty)]}>
+            <ThemedText style={styles.difficultyText}>{currentTrek.difficulty}</ThemedText>
+          </View>
+        </View>
 
-//             <View style={styles.section}>
-//               <Text style={styles.sectionTitle}>Required Permits</Text>
-//               <View style={styles.tagContainer}>
-//                 {currentTrek.required_permits.map((permit, index) => (
-//                   <View key={index} style={styles.tag}>
-//                     <Text style={styles.tagText}>{permit}</Text>
-//                   </View>
-//                 ))}
-//               </View>
-//             </View>
+        {/* Tab Navigation */}
+        <View style={styles.tabContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {tabs.map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[
+                  styles.tab,
+                  activeTab === tab && styles.activeTab
+                ]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <ThemedText
+                  style={[
+                    styles.tabText,
+                    activeTab === tab && styles.activeTabText
+                  ]}
+                >
+                  {tab}
+                </ThemedText>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
-//             <TouchableOpacity
-//               style={styles.timsButton}
-//               onPress={() => {
-//                 if (isAuthenticated) {
-//                   router.push({
-//                     pathname: "/tims/apply",
-//                     params: {
-//                       trekId: currentTrek.id,
-//                       trekArea: currentTrek.region,
-//                       trekRoute: currentTrek.name,
-//                     },
-//                   });
-//                 } else {
-//                   Alert.alert(
-//                     "Login Required",
-//                     "Please log in to apply for a TIMS permit.",
-//                     [
-//                       { text: "Cancel", style: "cancel" },
-//                       {
-//                         text: "Login",
-//                         onPress: () => router.push("/auth/login"),
-//                       },
-//                     ]
-//                   );
-//                 }
-//               }}
-//               activeOpacity={0.7}
-//             >
-//               <Text style={styles.timsButtonText}>
-//                 Issue TIMS Transit Pass Online
-//               </Text>
-//             </TouchableOpacity>
-//           </View>
-//         );
+        {/* Tab Content */}
+        {renderTabContent()}
+      </ScrollView>
+    </>
+  );
+}
 
-//       case "gear":
-//         return (
-//           <View>
-//             <Text style={styles.gearIntro}>
-//               Essential gear for the {currentTrek.name}:
-//             </Text>
-//             <View style={styles.gearList}>
-//               {currentTrek.recommended_gear.map((gear, index) => (
-//                 <View key={index} style={styles.gearItem}>
-//                   <View style={styles.gearDot} />
-//                   <Text style={styles.gearText}>{gear}</Text>
-//                 </View>
-//               ))}
-//             </View>
-//           </View>
-//         );
-
-//       default:
-//         return null;
-//     }
-//   };
-
-//   if (loading) {
-//     return (
-//       <SafeAreaView style={styles.container}>
-//         <View style={styles.loadingContainer}>
-//           <ActivityIndicator size="large" color={colors.primary} />
-//           <Text style={styles.loadingText}>Loading trek details...</Text>
-//         </View>
-//       </SafeAreaView>
-//     );
-//   }
-
-//   if (!currentTrek) {
-//     return (
-//       <SafeAreaView style={styles.container}>
-//         <View style={styles.errorContainer}>
-//           <Text style={styles.errorText}>Trek not found</Text>
-//           <TouchableOpacity
-//             style={styles.backButton}
-//             onPress={() => router.back()}
-//           >
-//             <Text style={styles.backButtonText}>Go Back</Text>
-//           </TouchableOpacity>
-//         </View>
-//       </SafeAreaView>
-//     );
-//   }
-
-//   return (
-//     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-//       <View style={styles.imageContainer}>
-//         <ScrollView
-//           horizontal
-//           pagingEnabled
-//           showsHorizontalScrollIndicator={false}
-//           onMomentumScrollEnd={(event) => {
-//             const newIndex = Math.floor(
-//               event.nativeEvent.contentOffset.x / width
-//             );
-//             setActiveImageIndex(newIndex);
-//           }}
-//         >
-//           {currentTrek.photos.map((photo, index) => (
-//             <Image
-//               key={index}
-//               source={{ uri: photo }}
-//               style={styles.image}
-//               resizeMode="cover"
-//             />
-//           ))}
-//         </ScrollView>
-
-//         <View style={styles.imagePagination}>
-//           {currentTrek.photos.map((_, index) => (
-//             <View
-//               key={index}
-//               style={[
-//                 styles.paginationDot,
-//                 index === activeImageIndex && styles.paginationDotActive,
-//               ]}
-//             />
-//           ))}
-//         </View>
-
-//         <TouchableOpacity
-//           style={styles.favoriteButton}
-//           onPress={handleToggleFavorite}
-//           activeOpacity={0.7}
-//         >
-//           <Text style={styles.favoriteIcon}>
-//             {favorite ? "❤️" : "🤍"}
-//           </Text>
-//         </TouchableOpacity>
-//       </View>
-
-//       <View style={styles.content}>
-//         <View style={styles.header}>
-//           <Text style={styles.title}>{currentTrek.name}</Text>
-//           <View style={styles.locationContainer}>
-//             <Text style={styles.locationIcon}>📍</Text>
-//             <Text style={styles.location}>
-//               {currentTrek.district}, {currentTrek.region}
-//             </Text>
-//           </View>
-
-//           <View style={styles.difficultyContainer}>
-//             <View
-//               style={[
-//                 styles.difficultyBadge,
-//                 { backgroundColor: getDifficultyColor(currentTrek.difficulty) },
-//               ]}
-//             >
-//               <Text style={styles.difficultyText}>{currentTrek.difficulty}</Text>
-//             </View>
-//           </View>
-//         </View>
-
-//         <View style={styles.tabContainer}>
-//           <TouchableOpacity
-//             style={[styles.tab, activeTab === "overview" && styles.activeTab]}
-//             onPress={() => setActiveTab("overview")}
-//             activeOpacity={0.7}
-//           >
-//             <Text
-//               style={[
-//                 styles.tabText,
-//                 activeTab === "overview" && styles.activeTabText,
-//               ]}
-//             >
-//               Overview
-//             </Text>
-//           </TouchableOpacity>
-
-//           <TouchableOpacity
-//             style={[styles.tab, activeTab === "itinerary" && styles.activeTab]}
-//             onPress={() => setActiveTab("itinerary")}
-//             activeOpacity={0.7}
-//           >
-//             <Text
-//               style={[
-//                 styles.tabText,
-//                 activeTab === "itinerary" && styles.activeTabText,
-//               ]}
-//             >
-//               Itinerary
-//             </Text>
-//           </TouchableOpacity>
-
-//           <TouchableOpacity
-//             style={[styles.tab, activeTab === "costs" && styles.activeTab]}
-//             onPress={() => setActiveTab("costs")}
-//             activeOpacity={0.7}
-//           >
-//             <Text
-//               style={[
-//                 styles.tabText,
-//                 activeTab === "costs" && styles.activeTabText,
-//               ]}
-//             >
-//               Costs
-//             </Text>
-//           </TouchableOpacity>
-
-//           <TouchableOpacity
-//             style={[styles.tab, activeTab === "gear" && styles.activeTab]}
-//             onPress={() => setActiveTab("gear")}
-//             activeOpacity={0.7}
-//           >
-//             <Text
-//               style={[
-//                 styles.tabText,
-//                 activeTab === "gear" && styles.activeTabText,
-//               ]}
-//             >
-//               Gear
-//             </Text>
-//           </TouchableOpacity>
-//         </View>
-
-//         <View style={styles.tabContent}>{renderTabContent()}</View>
-//       </View>
-//     </ScrollView>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: colors.background || '#FFFFFF',
-//   },
-//   loadingContainer: {
-//     flex: 1,
-//     justifyContent: "center",
-//     alignItems: "center",
-//   },
-//   loadingText: {
-//     marginTop: 16,
-//     fontSize: 16,
-//     color: colors.text || '#000000',
-//   },
-//   errorContainer: {
-//     flex: 1,
-//     justifyContent: "center",
-//     alignItems: "center",
-//     paddingHorizontal: 32,
-//   },
-//   errorText: {
-//     fontSize: 18,
-//     color: colors.text || '#000000',
-//     textAlign: 'center',
-//     marginBottom: 24,
-//   },
-//   backButton: {
-//     backgroundColor: colors.primary || '#007AFF',
-//     paddingHorizontal: 24,
-//     paddingVertical: 12,
-//     borderRadius: 8,
-//   },
-//   backButtonText: {
-//     color: '#FFFFFF',
-//     fontSize: 16,
-//     fontWeight: '600',
-//   },
-//   imageContainer: {
-//     height: 300,
-//     position: "relative",
-//   },
-//   image: {
-//     width,
-//     height: 300,
-//   },
-//   imagePagination: {
-//     position: "absolute",
-//     bottom: 16,
-//     left: 0,
-//     right: 0,
-//     flexDirection: "row",
-//     justifyContent: "center",
-//   },
-//   paginationDot: {
-//     width: 8,
-//     height: 8,
-//     borderRadius: 4,
-//     backgroundColor: "rgba(255, 255, 255, 0.5)",
-//     marginHorizontal: 4,
-//   },
-//   paginationDotActive: {
-//     backgroundColor: colors.white || '#FFFFFF',
-//   },
-//   favoriteButton: {
-//     position: "absolute",
-//     top: 16,
-//     right: 16,
-//     width: 40,
-//     height: 40,
-//     borderRadius: 20,
-//     backgroundColor: "rgba(0, 0, 0, 0.3)",
-//     justifyContent: "center",
-//     alignItems: "center",
-//   },
-//   favoriteIcon: {
-//     fontSize: 20,
-//   },
-//   content: {
-//     flex: 1,
-//     padding: 16,
-//   },
-//   header: {
-//     marginBottom: 16,
-//   },
-//   title: {
-//     fontSize: 24,
-//     fontWeight: "bold",
-//     color: colors.text || '#000000',
-//     marginBottom: 8,
-//   },
-//   locationContainer: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     marginBottom: 8,
-//   },
-//   location: {
-//     fontSize: 14,
-//     color: colors.textSecondary || '#666666',
-//     marginLeft: 4,
-//   },
-// //   
-//   difficultyContainer: {
-//     flexDirection: "row",
-//   },
-//   difficultyBadge: {
-//     paddingHorizontal: 12,
-//     paddingVertical: 6,
-//     borderRadius: 4,
-//   },
-//   difficultyText: {
-//     color: colors.white,
-//     fontSize: 12,
-//     fontWeight: "600",
-//   },
-//   tabContainer: {
-//     flexDirection: "row",
-//     borderBottomWidth: 1,
-//     borderBottomColor: colors.border,
-//     marginBottom: 16,
-//   },
-//   tab: {
-//     flex: 1,
-//     paddingVertical: 12,
-//     alignItems: "center",
-//   },
-//   activeTab: {
-//     borderBottomWidth: 2,
-//     borderBottomColor: colors.primary,
-//   },
-//   tabText: {
-//     fontSize: 14,
-//     color: colors.textSecondary,
-//     fontWeight: "500",
-//   },
-//   activeTabText: {
-//     color: colors.primary,
-//     fontWeight: "600",
-//   },
-//   tabContent: {
-//     flex: 1,
-//   },
-//   description: {
-//     fontSize: 16,
-//     color: colors.text,
-//     lineHeight: 24,
-//     marginBottom: 16,
-//   },
-//   infoSection: {
-//     backgroundColor: colors.card,
-//     borderRadius: 12,
-//     padding: 16,
-//     marginBottom: 16,
-//   },
-//   infoRow: {
-//     flexDirection: "row",
-//     marginBottom: 16,
-//   },
-//   infoItem: {
-//     flex: 1,
-//     flexDirection: "row",
-//     alignItems: "flex-start",
-//   },
-//   infoTextContainer: {
-//     marginLeft: 8,
-//   },
-//   infoLabel: {
-//     fontSize: 12,
-//     color: colors.textSecondary,
-//     marginBottom: 2,
-//   },
-//   infoValue: {
-//     fontSize: 14,
-//     color: colors.text,
-//     fontWeight: "500",
-//   },
-//   section: {
-//     marginBottom: 16,
-//   },
-//   sectionTitle: {
-//     fontSize: 18,
-//     fontWeight: "bold",
-//     color: colors.text,
-//     marginBottom: 8,
-//   },
-//   sectionText: {
-//     fontSize: 14,
-//     color: colors.text,
-//     lineHeight: 22,
-//   },
-//   tagContainer: {
-//     flexDirection: "row",
-//     flexWrap: "wrap",
-//   },
-//   tag: {
-//     backgroundColor: colors.card,
-//     borderRadius: 16,
-//     paddingHorizontal: 12,
-//     paddingVertical: 6,
-//     marginRight: 8,
-//     marginBottom: 8,
-//   },
-//   tagText: {
-//     fontSize: 12,
-//     color: colors.text,
-//   },
-//   safetyContainer: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     backgroundColor: `${colors.warning}20`,
-//     borderRadius: 8,
-//     padding: 12,
-//   },
-//   safetyText: {
-//     fontSize: 14,
-//     color: colors.text,
-//     marginLeft: 8,
-//   },
-//   itineraryContainer: {
-//     marginTop: 8,
-//   },
-//   itineraryItem: {
-//     flexDirection: "row",
-//     marginBottom: 16,
-//   },
-//   itineraryDot: {
-//     width: 12,
-//     height: 12,
-//     borderRadius: 6,
-//     backgroundColor: colors.primary,
-//     marginTop: 4,
-//     marginRight: 12,
-//   },
-//   itineraryContent: {
-//     flex: 1,
-//     borderBottomWidth: 1,
-//     borderBottomColor: colors.border,
-//     paddingBottom: 16,
-//   },
-//   itineraryDay: {
-//     fontSize: 14,
-//     color: colors.text,
-//     lineHeight: 20,
-//   },
-//   costSection: {
-//     marginBottom: 16,
-//   },
-//   costTitle: {
-//     fontSize: 16,
-//     fontWeight: "600",
-//     color: colors.text,
-//     marginBottom: 4,
-//   },
-//   costText: {
-//     fontSize: 14,
-//     color: colors.text,
-//     lineHeight: 20,
-//   },
-//   gearIntro: {
-//     fontSize: 14,
-//     color: colors.text,
-//     marginBottom: 16,
-//   },
-//   gearList: {
-//     backgroundColor: colors.card,
-//     borderRadius: 12,
-//     padding: 16,
-//   },
-//   gearItem: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     marginBottom: 12,
-//   },
-//   gearDot: {
-//     width: 8,
-//     height: 8,
-//     borderRadius: 4,
-//     backgroundColor: colors.primary,
-//     marginRight: 12,
-//   },
-//   gearText: {
-//     fontSize: 14,
-//     color: colors.text,
-//   },
-//   timsButton: {
-//     backgroundColor: colors.primary,
-//     paddingVertical: 12,
-//     paddingHorizontal: 20,
-//     borderRadius: 8,
-//     alignItems: "center",
-//     marginTop: 20, // Add some space above the button
-//     marginBottom: 10,
-//   },
-//   timsButtonText: {
-//     color: colors.white,
-//     fontSize: 16,
-//     fontWeight: "bold",
-//   },
-// });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  imageSliderContainer: {
+    height: 300,
+    position: 'relative',
+  },
+  headerImage: {
+    width: width,
+    height: 300,
+    resizeMode: 'cover',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backdropFilter: 'blur(10px)',
+  },
+  imageIndicators: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  indicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'white',
+  },
+  headerInfo: {
+    padding: 20,
+    paddingBottom: 0,
+  },
+  trekTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 8,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 4,
+  },
+  locationText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  difficultyBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  difficultyText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  tabContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    marginTop: 20,
+  },
+  tab: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginHorizontal: 4,
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#4A90E2',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  activeTabText: {
+    color: '#4A90E2',
+    fontWeight: '600',
+  },
+  tabContent: {
+    padding: 20,
+  },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333',
+    marginBottom: 24,
+  },
+  infoGrid: {
+    gap: 16,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  infoTextContainer: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  itineraryListItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    gap: 12,
+  },
+  dayDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4A90E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  dayNumber: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  itineraryText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 22,
+  },
+  costItem: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  costLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  costValue: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 22,
+  },
+  gearTitle: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 16,
+    fontWeight: '500',
+  },
+  gearItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  gearDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4A90E2',
+  },
+  gearText: {
+    fontSize: 16,
+    color: '#333',
+  },
+});

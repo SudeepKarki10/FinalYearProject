@@ -39,14 +39,18 @@ interface Trek {
 
 interface TrekDetailStore {
   currentTrek: Trek | null;
+  favoriteIds: Set<number>;
   loading: boolean;
   error: string | null;
   fetchTrekById: (id: number) => Promise<void>;
   clearCurrentTrek: () => void;
+  toggleFavorite: (trekId: number) => void;
+  isFavorite: (trekId: number) => boolean;
 }
 
-export const useTrekDetailStore = create<TrekDetailStore>((set) => ({
+export const useTrekDetailStore = create<TrekDetailStore>((set, get) => ({
   currentTrek: null,
+  favoriteIds: new Set<number>(),
   loading: false,
   error: null,
 
@@ -54,8 +58,8 @@ export const useTrekDetailStore = create<TrekDetailStore>((set) => ({
     set({ loading: true, error: null });
     
     try {
-      const response = await fetch(`https://treknepal.onrender.com/api/treks/${id}/`);
-      
+      const response = await fetch(`http://192.168.0.101:8000/api/treks/${id}/`);
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -83,5 +87,23 @@ export const useTrekDetailStore = create<TrekDetailStore>((set) => ({
       loading: false,
       error: null,
     });
+  },
+
+  toggleFavorite: (trekId: number) => {
+    const state = get();
+    const newFavoriteIds = new Set(state.favoriteIds);
+    
+    if (newFavoriteIds.has(trekId)) {
+      newFavoriteIds.delete(trekId);
+    } else {
+      newFavoriteIds.add(trekId);
+    }
+    
+    set({ favoriteIds: newFavoriteIds });
+  },
+
+  isFavorite: (trekId: number) => {
+    const state = get();
+    return state.favoriteIds.has(trekId);
   },
 }));

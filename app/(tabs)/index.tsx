@@ -1,249 +1,107 @@
-import React, { useEffect } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { FlatList, ScrollView, StyleSheet, View } from "react-native";
+import { CategoryCard } from "../../components/CategoryCard";
+import OnboardingForm from "../../components/OnboardingForm";
+import { RecommendedTreks } from "../../components/RecommendedTreks";
+import { SearchBar } from "../../components/SearchBar";
+import { ThemedText } from "../../components/ThemedText";
+import { ThemedView } from "../../components/ThemedView";
 import { TrekCard } from "../../components/TrekCard";
-import { colors } from "../../constants/Colors";
+import { useAuthStore } from "../../store/auth-store";
 import { useTrekStore } from "../../store/trek-store";
-import type { Trek } from "../../types";
+import { Trek } from "../../types";
 
-export default function HomeScreen() {
-  const { 
-    featuredTreks, 
-    popularTreks, 
-    loading, 
-    error, 
-    fetchTreks 
-  } = useTrekStore();
+export default function MainPage() {
+  const { fetchTreks, treks, fetchRecommendedTreks, recommendedTreks } = useTrekStore();
+  const { isAuthenticated, hasCompletedOnboarding } = useAuthStore();
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const renderTrekCard = useCallback(({ item }: { item: Trek }) => (
+    <TrekCard trek={item} style={styles.trekCard} />
+  ), []);
 
   useEffect(() => {
     fetchTreks();
-  }, [fetchTreks]);
-
-  useEffect(() => {
-    if (error) {
-      Alert.alert('Error', error);
+    if (isAuthenticated) {
+      fetchRecommendedTreks();
     }
-  }, [error]);
+  }, [fetchTreks, fetchRecommendedTreks, isAuthenticated]);
+
+  if (isAuthenticated && !hasCompletedOnboarding) {
+    return <OnboardingForm />;
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require("../../assets/images/logo.png")}
-              style={styles.logoImage}
-            />
-            <Text style={styles.logoText}>Nepal Trek Explorer</Text>
-          </View>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Text style={styles.notificationIcon}>🔔</Text>
-          </TouchableOpacity>
+    <ThemedView style={styles.container}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <View style={styles.searchBar}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onClear={() => setSearchQuery("")}
+          />
         </View>
+        
+        {/* Categories Section */}
+        <FlatList
+          horizontal
+          data={["Hiking", "Camping", "Cycling", "Climbing"]}
+          renderItem={({ item }) => <CategoryCard category={item} />}
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesList}
+        />
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <Text style={styles.searchPlaceholder}>
-              Search treks, districts, or attractions...
-            </Text>
-          </View>
-        </View>
+        {/* Recommended Treks Section */}
+        {isAuthenticated && <RecommendedTreks treks={recommendedTreks} />}
 
-        {/* Featured Treks */}
+        {/* Featured Treks Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Featured Treks</Text>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.featuredContainer}
-            >
-              {featuredTreks.map((trek: Trek) => (
-                <TrekCard
-                  key={trek.id}
-                  trek={trek}
-                  compact={true}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </View>
-
-        {/* Explore by Category */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Explore by Category</Text>
-          <View style={styles.categoriesContainer}>
-            <TouchableOpacity style={styles.categoryCard}>
-              <View style={[styles.categoryIcon, { backgroundColor: '#e1f5fe' }]}>
-                <Text style={styles.categoryIconText}>🏔️</Text>
-              </View>
-              <Text style={styles.categoryName}>Treks</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.categoryCard}>
-              <View style={[styles.categoryIcon, { backgroundColor: '#fff3e0' }]}>
-                <Text style={styles.categoryIconText}>🗺️</Text>
-              </View>
-              <Text style={styles.categoryName}>Districts</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.categoryCard}>
-              <View style={[styles.categoryIcon, { backgroundColor: '#e8f5e9' }]}>
-                <Text style={styles.categoryIconText}>🏞️</Text>
-              </View>
-              <Text style={styles.categoryName}>Attractions</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Popular Treks */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Popular Treks</Text>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <View style={styles.popularContainer}>
-              {popularTreks.map((trek: Trek) => (
-                <View key={trek.id} style={styles.popularCard}>
-                  <TrekCard trek={trek} />
-                </View>
-              ))}
-            </View>
-          )}
+          <ThemedText style={styles.sectionTitle}>Featured Treks</ThemedText>
+          <FlatList
+            horizontal
+            data={treks}
+            renderItem={renderTrekCard}
+            keyExtractor={(item) => item.id.toString()}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treksList}
+          />
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  scrollView: {
+    flex: 1,
   },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  logoImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  logoText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.text,
-  },
-  notificationButton: {
-    padding: 8,
-  },
-  notificationIcon: {
-    fontSize: 20,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    marginTop: 16,
+  contentContainer: {
+    paddingBottom: 20,
   },
   searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.background,
-    borderRadius: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  categoriesList: {
+    marginTop: 16,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchIcon: {
-    marginRight: 8,
-    color: colors.textSecondary,
-  },
-  searchPlaceholder: {
-    color: colors.textSecondary,
   },
   section: {
     marginTop: 24,
-    paddingHorizontal: 16,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: colors.text,
     marginBottom: 16,
+    marginHorizontal: 16,
   },
-  loadingContainer: {
-    paddingVertical: 32,
-    alignItems: "center",
+  treksList: {
+    paddingHorizontal: 16,
   },
-  featuredContainer: {
-    paddingLeft: 16,
-    paddingRight: 8,
-    paddingBottom: 8,
-    gap: 12,
-  },
-  categoriesContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-    gap: 12,
-  },
-  categoryCard: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-  },
-  categoryIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  categoryIconText: {
-    fontSize: 20,
-  },
-  categoryName: {
-    fontSize: 14,
-    color: colors.text,
-  },
-  popularContainer: {
-    gap: 12,
-  },
-  popularCard: {
-    marginBottom: 12,
+  trekCard: {
+    marginRight: 16,
   },
 });

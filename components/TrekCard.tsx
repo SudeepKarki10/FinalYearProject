@@ -3,12 +3,16 @@ import React from 'react';
 import {
   Dimensions,
   Image,
+  StyleProp,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from 'react-native';
 import { colors } from '../constants/Colors';
+import { useTrekStore } from '../store/trek-store';
+import { useTrekDetailStore } from '../store/trek-store-single';
 
 const { width } = Dimensions.get('window');
 
@@ -29,14 +33,39 @@ interface Trek {
 interface TrekCardProps {
   trek: Trek;
   compact?: boolean;
+  showFavorite?: boolean;
+  useStore?: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
-export const TrekCard: React.FC<TrekCardProps> = ({ trek, compact = false }) => {
+export const TrekCard: React.FC<TrekCardProps> = ({ 
+  trek, 
+  compact = false, 
+  showFavorite = false,
+  useStore = false,
+  style 
+}) => {
   const router = useRouter();
+  
+  // Store methods (only used when useStore is true)
+  const { toggleFavorite, isFavorite } = useTrekStore();
+  const { fetchTrekById } = useTrekDetailStore();
 
   const handlePress = () => {
+    if (useStore) {
+      fetchTrekById(trek.id);
+    }
     router.push(`/trek/${trek.id}`);
   };
+
+  const handleFavoritePress = (e: any) => {
+    e.stopPropagation();
+    if (useStore) {
+      toggleFavorite(trek.id);
+    }
+  };
+
+  const isCurrentTrekFavorite = useStore ? isFavorite(trek.id) : false;
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
@@ -56,7 +85,7 @@ export const TrekCard: React.FC<TrekCardProps> = ({ trek, compact = false }) => 
   if (compact) {
     return (
       <TouchableOpacity
-        style={styles.compactCard}
+        style={[styles.compactCard, style]}
         onPress={handlePress}
         activeOpacity={0.8}
       >
@@ -65,6 +94,17 @@ export const TrekCard: React.FC<TrekCardProps> = ({ trek, compact = false }) => 
           style={styles.compactImage}
           resizeMode="cover"
         />
+        {showFavorite && (
+          <TouchableOpacity
+            style={styles.favoriteButton}
+            onPress={handleFavoritePress}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.favoriteIcon}>
+              {isCurrentTrekFavorite ? '❤️' : '🤍'}
+            </Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.compactContent}>
           <Text style={styles.compactTitle} numberOfLines={2}>
             {trek.name}
@@ -94,7 +134,7 @@ export const TrekCard: React.FC<TrekCardProps> = ({ trek, compact = false }) => 
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, style]}
       onPress={handlePress}
       activeOpacity={0.8}
     >
@@ -113,6 +153,17 @@ export const TrekCard: React.FC<TrekCardProps> = ({ trek, compact = false }) => 
           >
             <Text style={styles.difficultyText}>{trek.difficulty}</Text>
           </View>
+          {showFavorite && (
+            <TouchableOpacity
+              style={styles.favoriteButtonRegular}
+              onPress={handleFavoritePress}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.favoriteIcon}>
+                {isCurrentTrekFavorite ? '❤️' : '🤍'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
       
@@ -204,6 +255,47 @@ const styles = StyleSheet.create({
     color: colors.textSecondary || '#666666',
   },
 
+  // Favorite button styles
+  favoriteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  favoriteButtonRegular: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  favoriteIcon: {
+    fontSize: 16,
+  },
+
   // Regular card styles
   card: {
     backgroundColor: colors.card || '#FFFFFF',
@@ -231,6 +323,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   difficultyBadge: {
     paddingHorizontal: 8,

@@ -1,5 +1,5 @@
 // Color palette for the app
-export const colors = {
+ export const colors = {
   primary: "#3498db",
   secondary: "#e67e22",
   background: "#ffffff",
@@ -22,6 +22,8 @@ export const colors = {
     extreme: "#8e44ad",
   },
 };
+
+
 
 export default {
   light: {

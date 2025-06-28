@@ -2,14 +2,22 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-const API_BASE_URL = "https://treknepal.onrender.com/api";
+const API_BASE_URL = "http://192.168.0.101:8000/api";
+
+export type UserInterests = string[];
 
 interface User {
-  id: string | number;  // Allow both string and number
+  id: number;  // Backend always sends numeric ID
   username: string;
   email: string;
   display_name: string;
   photo_url?: string | null;
+  interests?: UserInterests;
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+  };
 }
 
 interface AuthState {
@@ -19,6 +27,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   successMessage: string | null;
+  hasCompletedOnboarding: boolean;
 
   // Actions
   login: (username: string, password: string) => Promise<void>;
@@ -28,12 +37,11 @@ interface AuthState {
   clearSuccessMessage: () => void;
   initAuth: () => Promise<void>;
   checkTokenValidity: () => Promise<boolean>;
+  updateUserInterests: (interests: UserInterests) => Promise<boolean | void>;
 }
 
 
 export const useAuthStore = create<AuthState>()(
-
-  
   persist(
     (set, get) => ({
       user: null,
@@ -42,12 +50,13 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
       successMessage: null,
+      hasCompletedOnboarding: false,
 
      login: async (username, password) => {
   set({ isLoading: true, error: null, successMessage: null });
   
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await fetch(`${API_BASE_URL}/login/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -63,11 +72,17 @@ export const useAuthStore = create<AuthState>()(
     // Extract and transform nested user data
     const { token, user: responseUser } = data;
     const user: User = {
-      id: responseUser.user.id,  // Preserve as number
+      id: responseUser.user.id,
       username: responseUser.user.username,
       email: responseUser.user.email,
       display_name: responseUser.display_name,
       photo_url: responseUser.photo_url || null,
+      user: {
+        id: responseUser.user.id,
+        username: responseUser.user.username,
+        email: responseUser.user.email,
+      },
+      interests: responseUser.profile?.interests || [],
     };
 
     await AsyncStorage.setItem('auth_token', token);
@@ -78,16 +93,16 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: true,
       isLoading: false,
       successMessage: "Login successful!",
+      hasCompletedOnboarding: user.interests !== undefined,
     });
 
   } catch (error:any) {
-    // ... error handling remains the same ...
-     console.error('Login error:', error);
-          set({
-            isLoading: false,
-            error: error.message || "Failed to login. Please check your credentials.",
-          });
-          throw error;
+    console.error('Login error:', error);
+    set({
+      isLoading: false,
+      error: error.message || "Failed to login. Please check your credentials.",
+    });
+    throw error;
   }
 },
 
@@ -95,42 +110,49 @@ export const useAuthStore = create<AuthState>()(
     
 
       register: async (username, email, password, display_name, photo_url) => {
-  set({ isLoading: true, error: null, successMessage: null });
-  
-  try {
-    const response = await fetch(`${API_BASE_URL}/signup/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password, display_name, photo_url }),
-    });
+        set({ isLoading: true, error: null, successMessage: null });
+        
+        try {
+          const response = await fetch(`${API_BASE_URL}/signup/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, email, password, display_name, photo_url }),
+          });
 
-    const data = await response.json();
+          const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.message || data.error || 'Registration failed');
-    }
+          if (!response.ok) {
+            throw new Error(data.message || data.error || 'Registration failed');
+          }
 
-    // Extract and transform nested user data
-    const { token, user: responseUser } = data;
-    const user: User = {
-      id: responseUser.user.id,  // Preserve as number
-      username: responseUser.user.username,
-      email: responseUser.user.email,
-      display_name: responseUser.display_name,
-      photo_url: responseUser.photo_url || null,
-    };
+          // Extract and transform nested user data
+          const { token, user: responseUser } = data;
+          const user: User = {
+            id: responseUser.user.id,
+            username: responseUser.user.username,
+            email: responseUser.user.email,
+            display_name: responseUser.display_name,
+            photo_url: responseUser.photo_url || null,
+            user: {
+              id: responseUser.user.id,
+              username: responseUser.user.username,
+              email: responseUser.user.email,
+            },
+            interests: undefined, // New users don't have interests yet
+          };
 
-    await AsyncStorage.setItem('auth_token', token);
+          await AsyncStorage.setItem('auth_token', token);
 
-    set({
-      user,
-      token,
-      isAuthenticated: true,
-      isLoading: false,
-      successMessage: "Registration successful!",
-    });
+          set({
+            user,
+            token,
+            isAuthenticated: true,
+            isLoading: false,
+            successMessage: "Registration successful!",
+            hasCompletedOnboarding: false,
+          });
 
-  } catch (error:any) {
+        } catch (error:any) {
           console.error('Registration error:', error);
           set({
             isLoading: false,
@@ -251,6 +273,60 @@ export const useAuthStore = create<AuthState>()(
           });
         }
       },
+
+      updateUserInterests: async (interests: UserInterests) => {
+        const { user, token } = get();
+        if (!user) {
+          console.error('Cannot update interests: User not logged in');
+          set({ hasCompletedOnboarding: true }); // Mark as complete even if not logged in
+          return false;
+        }
+
+        try {
+          console.log('Updating user interests:', interests);
+          // Ensure interests is an array
+          const safeInterests = Array.isArray(interests) ? interests : [];
+          
+          // Send the interests array directly in the profile
+          const data = {
+            "profile": {
+              "interests": safeInterests // Django will handle the JSON serialization
+            }
+          };
+
+          const response = await fetch(`${API_BASE_URL}/users/${user.id}/`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${token}`,
+            },
+            body: JSON.stringify(data),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to update interests');
+          }
+
+          const updatedUser = await response.json();
+          
+          // Safely update the user object
+          set({ 
+            user: { 
+              ...user, 
+              interests: updatedUser?.profile?.interests || [] 
+            },
+            hasCompletedOnboarding: true 
+          });
+          
+          return true;
+        } catch (error) {
+          console.error('Error updating interests:', error);
+          // Still mark onboarding as complete to prevent UI getting stuck
+          set({ hasCompletedOnboarding: true });
+          return false;
+        }
+      },
     }),
     {
       name: "auth-storage",
@@ -266,25 +342,25 @@ export const useAuthStore = create<AuthState>()(
 
 // Helper function to get authenticated headers for API calls
 export const getAuthHeaders = () => {
-  const { token } = useAuthStore.getState();
+  const store = useAuthStore.getState();
   return {
-    'Authorization': `Bearer ${token}`,
+    'Authorization': `Bearer ${store.token}`,
     'Content-Type': 'application/json',
   };
 };
 
 // Helper function to make authenticated API calls
 export const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
-  const { token } = useAuthStore.getState();
+  const store = useAuthStore.getState();
   
-  if (!token) {
+  if (!store.token) {
     throw new Error('No authentication token available');
   }
 
   return fetch(url, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `Bearer ${store.token}`,
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },
