@@ -48,6 +48,8 @@ interface TrekDetailStore {
   isFavorite: (trekId: number) => boolean;
 }
 
+const API_BASE_URL = "http://192.168.0.108:3000/api/";
+
 export const useTrekDetailStore = create<TrekDetailStore>((set, get) => ({
   currentTrek: null,
   favoriteIds: new Set<number>(),
@@ -58,7 +60,7 @@ export const useTrekDetailStore = create<TrekDetailStore>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/treks/${id}/`);
+      const response = await fetch(`${API_BASE_URL}treks/${id}/`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
