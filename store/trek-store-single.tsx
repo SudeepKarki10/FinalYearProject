@@ -48,7 +48,7 @@ interface TrekDetailStore {
   isFavorite: (trekId: number) => boolean;
 }
 
-const API_BASE_URL = "http://192.168.0.108:3000/api/";
+const API_BASE_URL = "http://192.168.18.4:8000/api/";
 
 export const useTrekDetailStore = create<TrekDetailStore>((set, get) => ({
   currentTrek: null,
