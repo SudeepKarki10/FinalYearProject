@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-const API_BASE_URL = "http://192.168.0.108:3000/api/";
+const API_BASE_URL = "http://192.168.18.4:8000/api/";
 
 export type UserInterests = string[];
 

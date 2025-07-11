@@ -54,7 +54,7 @@ interface TrekStore {
   getRecommendedTreks: () => Trek[];
 }
 
-const API_BASE_URL = "http://192.168.0.108:3000/api/";
+const API_BASE_URL = "http://192.168.18.4:8000/api/";
 
 
 const getAuthHeaders = async () => {

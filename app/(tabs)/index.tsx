@@ -13,7 +13,7 @@ import { Trek } from "../../types";
 
 export default function MainPage() {
   const { fetchTreks, treks, fetchRecommendedTreks, recommendedTreks } = useTrekStore();
-  const { isAuthenticated, hasCompletedOnboarding } = useAuthStore();
+  const { isAuthenticated, hasCompletedOnboarding, token } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   
   const renderTrekCard = useCallback(({ item }: { item: Trek }) => (
@@ -22,6 +22,7 @@ export default function MainPage() {
 
   useEffect(() => {
     fetchTreks();
+    
     // Fetch recommendations when user is authenticated AND has completed onboarding
     if (isAuthenticated && hasCompletedOnboarding) {
       fetchRecommendedTreks();

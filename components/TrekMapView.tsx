@@ -30,6 +30,28 @@ interface TrekMapViewProps {
 }
 
 const TrekMapView: React.FC<TrekMapViewProps> = ({ trek }) => {
+  // Calculate the initial region
+  const hasItineraryPoints = trek.itinerary_points && trek.itinerary_points.length > 0;
+  
+  // Center on the first stop (starting point)
+  const centerLat = hasItineraryPoints ? trek.itinerary_points![0].lat : 28.238339;
+  const centerLng = hasItineraryPoints ? trek.itinerary_points![0].lng : 84.382653;
+  
+  // Calculate deltas to show a reasonable area around the starting point
+  const latitudeDelta = 0.1; // Smaller value for closer zoom
+  const longitudeDelta = 0.1;
+  
+  const initialRegion = {
+    latitude: centerLat,
+    longitude: centerLng,
+    latitudeDelta: latitudeDelta,
+    longitudeDelta: longitudeDelta,
+  };
+  const routeCoordinates = hasItineraryPoints
+    ? trek.itinerary_points!.map((point) => ({ latitude: point.lat, longitude: point.lng }))
+    : [];
+
+
   // Only show map if not on web
   if (Platform.OS === "web") {
     return (
@@ -59,10 +81,6 @@ const TrekMapView: React.FC<TrekMapViewProps> = ({ trek }) => {
     );
   }
 
-  const hasItineraryPoints = trek.itinerary_points && trek.itinerary_points.length > 0;
-  console.log("Trek data:", trek);
-
-  // If no itinerary points available, show placeholder
   if (!hasItineraryPoints) {
     return (
       <View style={styles.container}>
@@ -79,35 +97,6 @@ const TrekMapView: React.FC<TrekMapViewProps> = ({ trek }) => {
       </View>
     );
   }
-
-  // Calculate the initial region to fit all points
-  const latitudes = trek.itinerary_points!.map((p) => p.lat);
-  const longitudes = trek.itinerary_points!.map((p) => p.lng);
-
-  const minLat = Math.min(...latitudes);
-  const maxLat = Math.max(...latitudes);
-  const minLng = Math.min(...longitudes);
-  const maxLng = Math.max(...longitudes);
-
-  const centerLat = (minLat + maxLat) / 2;
-  const centerLng = (minLng + maxLng) / 2;
-
-  // Add padding to delta to ensure markers aren't on the edge
-  const latitudeDelta = (maxLat - minLat) * 1.5 || 0.02;
-  const longitudeDelta = (maxLng - minLng) * 1.5 || 0.02;
-
-  const initialRegion = {
-    latitude: centerLat,
-    longitude: centerLng,
-    latitudeDelta: latitudeDelta,
-    longitudeDelta: longitudeDelta,
-  };
-
-  // Create coordinates for the polyline
-  const routeCoordinates = trek.itinerary_points!.map((point) => ({
-    latitude: point.lat,
-    longitude: point.lng,
-  }));
 
   return (
     <View style={styles.container}>
@@ -144,15 +133,9 @@ const TrekMapView: React.FC<TrekMapViewProps> = ({ trek }) => {
             }
           />
         ))}
+
       </MapView>
       
-      <View style={styles.overlay}>
-        <Text style={styles.trekName}>{trek.name}</Text>
-        <Text style={styles.trekLocation}>{trek.district}, {trek.region}</Text>
-        <Text style={styles.mapInfo}>
-          {trek.itinerary_points!.length} points along the route
-        </Text>
-      </View>
     </View>
   );
 };
@@ -210,6 +193,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     opacity: 0.8,
+  },
+  policeInfo: {
+    color: colors.white || "#FFFFFF",
+    fontSize: 11,
+    marginTop: 4,
+    opacity: 0.9,
+    fontWeight: "500",
+  },
+  hotelInfo: {
+    color: colors.white || "#FFFFFF",
+    fontSize: 11,
+    marginTop: 4,
+    opacity: 0.9,
+    fontWeight: "500",
+  },
+  hospitalInfo: {
+    color: colors.white || "#FFFFFF",
+    fontSize: 11,
+    marginTop: 4,
+    opacity: 0.9,
+    fontWeight: "500",
+    backgroundColor: "rgba(255,0,0,0.2)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   noDataText: {
     textAlign: "center",
