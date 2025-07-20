@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-  Dimensions,
   Image,
   StyleProp,
   StyleSheet,
@@ -13,8 +12,6 @@ import {
 import { colors } from '../constants/Colors';
 import { useTrekStore } from '../store/trek-store';
 import { useTrekDetailStore } from '../store/trek-store-single';
-
-const { width } = Dimensions.get('window');
 
 interface Trek {
   id: number;
@@ -106,7 +103,7 @@ export const TrekCard: React.FC<TrekCardProps> = ({
           </TouchableOpacity>
         )}
         <View style={styles.compactContent}>
-          <Text style={styles.compactTitle} numberOfLines={2}>
+          <Text style={styles.compactTitle}>
             {trek.name}
           </Text>
           <View style={styles.compactLocation}>
@@ -168,13 +165,13 @@ export const TrekCard: React.FC<TrekCardProps> = ({
       </View>
       
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={2}>
+        <Text style={styles.title}>
           {trek.name}
         </Text>
         
         <View style={styles.locationContainer}>
           <Text style={styles.locationIcon}>📍</Text>
-          <Text style={styles.location} numberOfLines={1}>
+          <Text style={styles.location}>
             {trek.district}, {trek.region}
           </Text>
         </View>
@@ -200,7 +197,7 @@ export const TrekCard: React.FC<TrekCardProps> = ({
 const styles = StyleSheet.create({
   // Compact card styles
   compactCard: {
-    width: width * 0.7,
+    width: 280, // Fixed width instead of percentage
     backgroundColor: colors.card || '#FFFFFF',
     borderRadius: 12,
     marginRight: 16,
@@ -227,6 +224,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text || '#000000',
     marginBottom: 8,
+    flexWrap: 'wrap', // Allow text wrapping
+    lineHeight: 20, // Better line spacing for wrapped text
   },
   compactLocation: {
     marginBottom: 8,
@@ -234,11 +233,15 @@ const styles = StyleSheet.create({
   compactLocationText: {
     fontSize: 12,
     color: colors.textSecondary || '#666666',
+    flexWrap: 'wrap', // Allow text wrapping
+    lineHeight: 16, // Better line spacing
   },
   compactDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap', // Allow wrapping if content is too wide
+    gap: 8, // Add gap between elements when wrapped
   },
   compactDifficulty: {
     paddingHorizontal: 8,
@@ -253,6 +256,7 @@ const styles = StyleSheet.create({
   compactDuration: {
     fontSize: 12,
     color: colors.textSecondary || '#666666',
+    flexShrink: 1, // Allow text to shrink if needed
   },
 
   // Favorite button styles
@@ -298,6 +302,7 @@ const styles = StyleSheet.create({
 
   // Regular card styles
   card: {
+    width: 320, // Fixed width for regular cards
     backgroundColor: colors.card || '#FFFFFF',
     borderRadius: 12,
     marginBottom: 16,
@@ -344,6 +349,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text || '#000000',
     marginBottom: 8,
+    flexWrap: 'wrap', // Allow text wrapping
+    lineHeight: 22, // Better line spacing for wrapped text
   },
   locationContainer: {
     flexDirection: 'row',
@@ -358,15 +365,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary || '#666666',
     flex: 1,
+    flexWrap: 'wrap', // Allow text wrapping
+    lineHeight: 18, // Better line spacing
   },
   detailsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    flexWrap: 'wrap', // Allow wrapping if content is too wide
+    gap: 8, // Add gap between elements when wrapped
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0, // Allow flex items to shrink below their content size
   },
   detailIcon: {
     fontSize: 12,
@@ -375,5 +387,7 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 12,
     color: colors.textSecondary || '#666666',
+    flexShrink: 1, // Allow text to shrink if needed
+    flexWrap: 'wrap', // Allow text wrapping
   },
 });

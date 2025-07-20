@@ -54,6 +54,9 @@ interface TrekStore {
   getRecommendedTreks: () => Trek[];
 }
 
+const API_BASE_URL = "http://192.168.18.4:8000/api/";
+
+
 const getAuthHeaders = async () => {
   try {
     const token = await AsyncStorage.getItem('auth_token');
@@ -80,7 +83,7 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
   fetchTreks: async () => {
     try {
       set({ loading: true, error: null });
-      const response = await fetch(`http://192.168.0.101:8000/api/treks/`);
+      const response = await fetch(`${API_BASE_URL}treks/`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -99,7 +102,7 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
     try {
       // Use regular treks endpoint if recommended endpoint isn't available
       const headers = await getAuthHeaders();
-      const response = await fetch(`http://192.168.0.101:8000/api/recommendations/`, {
+      const response = await fetch(`${API_BASE_URL}recommendations/`, {
         headers
       });
       
@@ -126,7 +129,7 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
     try {
       // Get authentication headers for the logged-in user
       const headers = await getAuthHeaders();
-      const response = await fetch(`http://192.168.0.101:8000/api/favorites/`, { headers });
+      const response = await fetch(`${API_BASE_URL}favorites/`, { headers });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -178,7 +181,7 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
       if (isFavorited) {
         console.log('Attempting to remove favorite for trek:', trekId);
         // First get the favorite ID
-        const favResponse = await fetch(`http://192.168.0.101:8000/api/favorites/`, {
+        const favResponse = await fetch(`${API_BASE_URL}favorites/`, {
           headers
         });
         
@@ -205,13 +208,13 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
         }
 
         // DELETE request with the favorite ID
-        response = await fetch(`http://192.168.0.101:8000/api/favorites/${favorite.id}/`, {
+        response = await fetch(`${API_BASE_URL}favorites/${favorite.id}/`, {
           method: 'DELETE',
           headers
         });
       } else {
         // POST request
-        response = await fetch(`http://192.168.0.101:8000/api/favorites/`, {
+        response = await fetch(`${API_BASE_URL}favorites/`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
