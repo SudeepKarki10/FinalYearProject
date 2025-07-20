@@ -1,13 +1,11 @@
 import { colors } from '@/constants/Colors';
 import { useAuthStore } from '@/store/auth-store';
+import { fetchSOSAlertDetails } from '@/store/sos-store';
 import type { SOSAlert } from '@/types/sos';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-
-const API_BASE_URL = "http://192.168.18.4:8000/api/";
 
 function QuickCallButton({ phone, name, type }: { phone: string; name: string; type: string }) {
   const handleCall = () => {
@@ -49,30 +47,15 @@ export default function AlertDetailsPage() {
   const { token } = useAuthStore();
 
   const fetchAlertDetails = useCallback(async () => {
-    if (!token) {
-      setError('Authentication required');
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const response = await fetch(`${API_BASE_URL}sos-alerts/${id}/`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Token ${token}`,
-        }
-      });
+      setIsLoading(true);
+      const { data, error: fetchError } = await fetchSOSAlertDetails(id, token || '');
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch alert details');
+      if (fetchError) {
+        setError(fetchError);
+      } else if (data) {
+        setAlert(data);
       }
-      const data = await response.json();
-      console.log('Alert details:', data); // Debug log
-      setAlert(data);
-    } catch (err) {
-      console.error('Error fetching alert:', err); // Debug log
-      setError(err instanceof Error ? err.message : 'Failed to load alert details');
     } finally {
       setIsLoading(false);
     }

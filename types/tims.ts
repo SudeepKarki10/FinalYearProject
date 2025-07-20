@@ -1,0 +1,35 @@
+export interface TimsPass {
+  id: number;
+  tims_card_no: string;
+  encrypted_qr_code: string | null;
+  transaction_id: string;
+  issue_date: string;
+  image: string;
+  full_name: string;
+  nationality: string;
+  passport_number: string;
+  gender: string;
+  date_of_birth: string;
+  trekker_area: string;
+  route: string;
+  entry_date: string;
+  exit_date: string;
+  nepal_contact_name: string;
+  nepal_organization: string;
+  nepal_designation: string;
+  nepal_mobile: string;
+  nepal_office_number: string;
+  nepal_address: string;
+  home_contact_name: string;
+  home_city: string;
+  home_mobile: string;
+  home_office_number: string;
+  home_address: string;
+  status: 'pending' | 'approved' | 'rejected';
+  payment_status: 'pending' | 'paid' | 'failed';
+  transit_pass_cost: Record<string, number>;
+  permit_cost: string;
+  created_at: string;
+  updated_at: string;
+  user: number;
+}

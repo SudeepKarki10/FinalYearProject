@@ -4,6 +4,9 @@ import SosCard, { SOSAlert } from '../components/SosCard';
 import { colors } from '../constants/Colors';
 import { useAuthStore } from '../store/auth-store'; // Assuming you have an auth store for token management
 
+
+const API_BASE_URL = "http://192.168.18.4:8000/api/";
+
 export default function RaisedIssuesScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [alerts, setAlerts] = useState<SOSAlert[]>([]);
@@ -13,10 +16,11 @@ export default function RaisedIssuesScreen() {
     fetchAlerts();
   }, []);
 
+
   const fetchAlerts = async () => {
     const {token} = useAuthStore.getState(); 
     try {
-      const response = await fetch('http://192.168.18.4:8000/api/sos-alerts/', {
+      const response = await fetch(`${API_BASE_URL}sos-alerts/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
