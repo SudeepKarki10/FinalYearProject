@@ -5,10 +5,12 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/Colors';
 import { UserInterests, useAuthStore } from '../store/auth-store';
+import { useTrekStore } from '../store/trek-store';
 
 interface InterestCategory {
   id: string;
@@ -58,8 +60,12 @@ const INTEREST_CATEGORIES: InterestCategory[] = [
 
 export default function OnboardingForm() {
   const { updateUserInterests } = useAuthStore();
+  const { fetchRecommendedTreks } = useTrekStore();
   const [selectedInterests, setSelectedInterests] = useState<UserInterests>([]);
   const [isNavigating, setIsNavigating] = useState(false);
+
+  // Remove the useEffect that fetches recommendations before user submits interests
+  // We'll fetch recommendations after interests are submitted
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests(prev => {
@@ -79,31 +85,47 @@ export default function OnboardingForm() {
     setIsNavigating(true);
     
     try {
-      // Update user interests and mark onboarding as complete
-      await updateUserInterests(selectedInterests);
-      
-      // Use setTimeout to ensure state update completes before navigation
-      setTimeout(() => {
+      // Only update interests if user has selected some
+      if (selectedInterests.length > 0) {
+        console.log('Updating user interests:', selectedInterests);
+        await updateUserInterests(selectedInterests);
+        console.log('User interests updated successfully');
+        
+        // Fetch recommendations after interests are updated
         try {
-          replace('/(tabs)');
-        } catch (navError) {
-          console.error('Navigation error:', navError);
-          setIsNavigating(false);
+          console.log('Fetching recommendations with new interests...');
+          await fetchRecommendedTreks();
+          console.log('Recommendations fetched successfully');
+        } catch (recError) {
+          console.error('Failed to fetch recommendations:', recError);
+          // Don't block navigation if recommendations fail
         }
-      }, 500);
+      } else {
+        console.log('Skipping without interests...');
+      }
     } catch (error) {
       console.error('Failed to update interests:', error);
-      setIsNavigating(false);
-      
-      // Even if the API fails, try to navigate to tabs
-      setTimeout(() => {
-        try {
-          replace('/(tabs)');
-        } catch (navError) {
-          console.error('Navigation error after API failure:', navError);
-        }
-      }, 500);
+      // Don't return here - still navigate even if API fails
     }
+    
+    // Always navigate regardless of API success/failure
+    setTimeout(() => {
+      try {
+        console.log('Navigating to tabs...');
+        replace('/(tabs)');
+      } catch (navError) {
+        console.error('Navigation error:', navError);
+        setIsNavigating(false);
+      }
+    }, 500);
+
+    // Safety timeout to reset navigation state
+    setTimeout(() => {
+      if (isNavigating) {
+        console.log('Navigation timeout - resetting state');
+        setIsNavigating(false);
+      }
+    }, 2000);
   };
 
   const renderCategory = (category: InterestCategory) => (
@@ -133,11 +155,45 @@ export default function OnboardingForm() {
     </View>
   );
 
+const handleSkip = async () => {
+  if (isNavigating) return;
+  
+  setIsNavigating(true);
+  
+  try {
+    console.log('Skipping onboarding...');
+    // Mark onboarding as complete even when skipping
+    await updateUserInterests([]); // This will set hasCompletedOnboarding to true
+    replace('/(tabs)');
+  } catch (navError) {
+    console.error('Navigation error:', navError);
+    setIsNavigating(false);
+  }
+};
+
+
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Help us personalize your experience</Text>
-        <Text style={styles.subtitle}>What kind of treks are you interested in?</Text>
+        <View style={styles.headerContent}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Help us personalize your experience</Text>
+            <Text style={styles.subtitle}>What kind of treks are you interested in?</Text>
+          </View>
+        
+          {/* Always show skip button for onboarding */}
+          <TouchableOpacity 
+            style={styles.skipButton} 
+            onPress={handleSkip}
+            activeOpacity={0.7}
+            disabled={isNavigating}
+          >
+            <Text style={styles.skipButtonText}>
+              {isNavigating ? 'Skipping...' : 'Skip'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
@@ -154,19 +210,16 @@ export default function OnboardingForm() {
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[
-            styles.submitButton,
-            selectedInterests.length === 0 && styles.submitButtonDisabled
-          ]} 
+          style={styles.submitButton}
           onPress={handleSubmit}
-          disabled={selectedInterests.length === 0}
+          disabled={isNavigating}
         >
           <Text style={styles.submitButtonText}>
-            {selectedInterests.length === 0 ? 'Select interests to continue' : 'Continue'}
+            {isNavigating ? 'Redirecting...' : (selectedInterests.length === 0 ? 'Skip & Continue' : 'Continue')}
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -177,13 +230,48 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    paddingBottom: 0,
+    paddingBottom: 8,
+    paddingTop: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    width: '100%',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 8,
+    flex: 1,
+    paddingRight: 16, // Add space for the skip button
+  },
+  skipButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    marginLeft: 8,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    zIndex: 1,
+  },
+  skipButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '700',
   },
   subtitle: {
     fontSize: 16,

@@ -13,7 +13,7 @@ import { Trek } from "../../types";
 
 export default function MainPage() {
   const { fetchTreks, treks, fetchRecommendedTreks, recommendedTreks } = useTrekStore();
-  const { isAuthenticated, hasCompletedOnboarding } = useAuthStore();
+  const { isAuthenticated, hasCompletedOnboarding, token } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   
   const renderTrekCard = useCallback(({ item }: { item: Trek }) => (
@@ -22,10 +22,12 @@ export default function MainPage() {
 
   useEffect(() => {
     fetchTreks();
-    if (isAuthenticated) {
+    
+    // Fetch recommendations when user is authenticated AND has completed onboarding
+    if (isAuthenticated && hasCompletedOnboarding) {
       fetchRecommendedTreks();
     }
-  }, [fetchTreks, fetchRecommendedTreks, isAuthenticated]);
+  }, [fetchTreks, fetchRecommendedTreks, isAuthenticated, hasCompletedOnboarding]);
 
   if (isAuthenticated && !hasCompletedOnboarding) {
     return <OnboardingForm />;
@@ -52,7 +54,7 @@ export default function MainPage() {
         />
 
         {/* Recommended Treks Section */}
-        {isAuthenticated && <RecommendedTreks treks={recommendedTreks} />}
+        {isAuthenticated && hasCompletedOnboarding && <RecommendedTreks treks={recommendedTreks} />}
 
         {/* Featured Treks Section */}
         <View style={styles.section}>

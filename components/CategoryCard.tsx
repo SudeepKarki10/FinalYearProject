@@ -1,9 +1,9 @@
-import React from "react";
-import { StyleSheet, View, Text, Pressable } from "react-native";
 import { Link } from "expo-router";
-import { Category } from "@/types/trek";
-import { colors } from "../constants/Colors";
 import { Camera, Map, Mountain, User } from "lucide-react-native";
+import React from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { colors } from "../constants/Colors";
+import { Category } from "../types/trek";
 
 interface CategoryCardProps {
   category: Category;

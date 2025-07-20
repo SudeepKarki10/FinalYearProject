@@ -1,0 +1,523 @@
+[
+  {
+    "itinerary_point": "Lukla",
+    "latitude": 27.68889,
+    "longitude": 86.73056,
+    "police_stations": [
+      {
+        "name": "Tourist Police Lukla",
+        "email": "policetourist@nepalpolice.gov.np",
+        "contact_number": "9852821304"
+      },
+      {
+        "name": "Lukla Police Station (Khumbu Pasanglhamu)",
+        "email": "ito.khumbupasanglhamumun@gmail.com",
+        "contact_number": "9852890133"
+      }
+    ],
+    "medical_facilities": [],
+    "lodges_hotels": []
+  }
+]
+
+
+,
+  {
+    "itinerary_point": "Lukla",
+    "latitude": 27.68889,
+    "longitude": 86.73056,
+    "medical_facilities": [
+      {
+        "name": "Lukla Hospital",
+        "email": "info@luklahospital.com",
+        "contact_number": "+977 38 55 01 19"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Lukla",
+    "latitude": 27.68889,
+    "longitude": 86.73056,
+    "lodges_hotels": [
+      {
+        "name": "Mountain Lodges of Nepal - Lukla Lodge",
+        "email": "info@mountainlodgesofnepal.com",
+        "contact_number": "+977 9801249331"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Phakding",
+    "latitude": 27.7333,
+    "longitude": 86.7333,
+    "police_stations": [
+      {
+        "name": "Phakding Police Post",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      }
+    ],
+    "medical_facilities": [],
+    "lodges_hotels": []
+  }
+
+
+,
+  {
+    "itinerary_point": "Phakding",
+    "latitude": 27.7333,
+    "longitude": 86.7333,
+    "medical_facilities": [
+      {
+        "name": "Himalayan Sherpa Hospital",
+        "email": "info@himalayansherpafoundation.org",
+        "contact_number": "01-4480064"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Phakding",
+    "latitude": 27.7333,
+    "longitude": 86.7333,
+    "lodges_hotels": [
+      {
+        "name": "Mountain Lodges of Nepal - Phakding Lodge",
+        "email": "info@mountainlodgesofnepal.com",
+        "contact_number": "sudeepkarki74@gmail.com"
+      },
+      {
+        "name": "Snowland Hotel & Restaurant",
+        "email": "snowlandphakding@gmail.com",
+        "contact_number": "+977 9801158010"
+      },
+      {
+        "name": "Hotel Sherpa",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9851087941, 9818310683"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Namche Bazaar",
+    "latitude": 27.8033,
+    "longitude": 86.7133,
+    "police_stations": [
+      {
+        "name": "Temporary Tourist Police Post Namche Bazar",
+        "email": "policetourist@nepalpolice.gov.np",
+        "contact_number": "9852821304"
+      }
+    ],
+    "medical_facilities": [],
+    "lodges_hotels": []
+  }
+
+
+,
+  {
+    "itinerary_point": "Namche Bazaar",
+    "latitude": 27.8033,
+    "longitude": 86.7133,
+    "medical_facilities": [
+      {
+        "name": "Namche Hospital",
+        "email": "info@umgnamchehospital.org",
+        "contact_number": "+977-38411001"
+      },
+      {
+        "name": "The Mountain Medical Institute",
+        "email": "Themountainmedical@gmail.com",
+        "contact_number": "+977 38-540006"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Namche Bazaar",
+    "latitude": 27.8033,
+    "longitude": 86.7133,
+    "lodges_hotels": [
+      {
+        "name": "Namche Lodge - Mountain Lodges of Nepal",
+        "email": "info@mountainlodgesofnepal.com",
+        "contact_number": "sudeepkarki74@gmail.com"
+      },
+      {
+        "name": "A.D. Friendship Lodge",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "038540201"
+      },
+      {
+        "name": "Sakura Lodge",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "038540091"
+      },
+      {
+        "name": "Sona Lodge",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "038540089"
+      },
+      {
+        "name": "Khumbu Lodge",
+        "email": "info@khumbulodge.com",
+        "contact_number": "977-38-540144, 540166"
+      },
+      {
+        "name": "Namche Hilltop Lodge & Restaurant",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "sudeepkarki74@gmail.com"
+      },
+      {
+        "name": "Himalayan Lodge",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "+977-9852850008, +977-038540060"
+      },
+      {
+        "name": "Panorama Lodge and Restaurant",
+        "email": "namche@gmail.com",
+        "contact_number": "+977 985 2850021"
+      },
+      {
+        "name": "Hotel Sherpaland Namche Bazar",
+        "email": "info@hotelsherpaland.com",
+        "contact_number": "sudeepkarki74@gmail.com"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Tengboche",
+    "latitude": 27.8433,
+    "longitude": 86.7667,
+    "police_stations": [
+      {
+        "name": "Tengboche Police Post",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      }
+    ],
+    "medical_facilities": [],
+    "lodges_hotels": []
+  }
+
+
+,
+  {
+    "itinerary_point": "Tengboche",
+    "latitude": 27.8433,
+    "longitude": 86.7667,
+    "medical_facilities": [
+      {
+        "name": "Tengboche Medical Post (informal)",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Tengboche",
+    "latitude": 27.8433,
+    "longitude": 86.7667,
+    "lodges_hotels": [
+      {
+        "name": "Hotel Himalayan",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "+977-9803580230"
+      },
+      {
+        "name": "Tashi Delek Lodge And Restaurant",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Tengboche Guest House",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Rivendell Lodge",
+        "email": "khumburivendell@gmail.com",
+        "contact_number": "9803527894, 9803641210"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Dingboche",
+    "latitude": 27.8933,
+    "longitude": 86.8233,
+    "police_stations": [
+      {
+        "name": "Dingboche Police Station",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      }
+    ],
+    "medical_facilities": [],
+    "lodges_hotels": []
+  }
+
+
+,
+  {
+    "itinerary_point": "Dingboche",
+    "latitude": 27.8933,
+    "longitude": 86.8233,
+    "medical_facilities": [
+      {
+        "name": "Dingboche Clinic Pvt Ltd",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "+977 984 319 03 56"
+      },
+      {
+        "name": "Himalayan Rescue Association (HRA) Pheriche Aid-post",
+        "email": "hra@himalayanrescue.org",
+        "contact_number": "01-4540292, 01-4540293"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Dingboche",
+    "latitude": 27.8933,
+    "longitude": 86.8233,
+    "lodges_hotels": [
+      {
+        "name": "Hotel Bright Star",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Moon Light lodge",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Peaceful Lodge",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Hotel Summit",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Hotel Tashi Delek",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Hotel Countryside",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "+977-9803228673,9841853324"
+      },
+      {
+        "name": "Everest Resort Dingboche",
+        "email": "everestresortnepal@gmail.com",
+        "contact_number": "+977-9818283299"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Lobuche",
+    "latitude": 27.9433,
+    "longitude": 86.8133,
+    "police_stations": [
+      {
+        "name": "Lobuche Police Post (informal)",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      }
+    ],
+    "medical_facilities": [],
+    "lodges_hotels": []
+  }
+
+
+,
+  {
+    "itinerary_point": "Lobuche",
+    "latitude": 27.9433,
+    "longitude": 86.8133,
+    "medical_facilities": [
+      {
+        "name": "Lobuche Health Post (basic)",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Himalayan Rescue Association (HRA) Pheriche Aid-post",
+        "email": "hra@himalayanrescue.org",
+        "contact_number": "01-4540292, 01-4540293"
+      }
+    ]
+  }
+
+
+,
+  {
+    "itinerary_point": "Lobuche",
+    "latitude": 27.9433,
+    "longitude": 86.8133,
+    "lodges_hotels": [
+      {
+        "name": "Lobuche - Mother Earth House",
+        "email": "contact@lobuche.com",
+        "contact_number": "+977 1 4226358"
+      },
+      {
+        "name": "8000 Inn, Lodge & Hotel",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "New EBC Guest House Lobuche",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9823317904"
+      },
+      {
+        "name": "Himalayan Eco Resort",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "977-1- 4424249"
+      },
+      {
+        "name": "Oxygen Altitude Home",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      }
+    ]
+  }
+
+
+[
+  {
+    "itinerary_point": "Lukla",
+    "latitude": 27.68889,
+    "longitude": 86.73056,
+    "police_stations": [
+      {
+        "name": "Tourist Police Lukla",
+        "email": "policetourist@nepalpolice.gov.np",
+        "contact_number": "9852821304"
+      },
+      {
+        "name": "Police Station (Lukla)",
+        "email": "ito.khumbupasanglhamumun@gmail.com",
+        "contact_number": "9852890133"
+      }
+    ],
+    "medical_facilities": [],
+    "lodges_hotels": []
+  }
+
+
+
+,
+  {
+    "itinerary_point": "Lukla",
+    "latitude": 27.68889,
+    "longitude": 86.73056,
+    "medical_facilities": [
+      {
+        "name": "Lukla Hospital",
+        "email": "info@luklahospital.com",
+        "contact_number": "+977 38 550119"
+      },
+      {
+        "name": "Pasang Lhamu-Nicole Niquille Hospital",
+        "email": "plnnhospital@gmail.com",
+        "contact_number": "+977 38 55 01 19"
+      }
+    ]
+  }
+
+
+
+,
+  {
+    "itinerary_point": "Lukla",
+    "latitude": 27.68889,
+    "longitude": 86.73056,
+    "lodges_hotels": [
+      {
+        "name": "Lukla Lodge - Mountain Lodges of Nepal",
+        "email": "info@mountainlodgesofnepal.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Himalayan Lodge",
+        "email": "info@himalayalodgelukla.com",
+        "contact_number": "977-1- 4422656, 4416880"
+      },
+      {
+        "name": "Everest Summit Lodges",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "+977 01 4371537"
+      },
+      {
+        "name": "Mera Lodge",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "+977-9852850666, +977-9802028666"
+      },
+      {
+        "name": "Hikers Inn Lukla",
+        "email": "hikersinnlukla@gmail.com",
+        "contact_number": "9808047844"
+      },
+      {
+        "name": "Yeti Mountain Home",
+        "email": "info@yetimountainhome.com",
+        "contact_number": "+977-1-4000712"
+      },
+      {
+        "name": "Shinee Comfort-Inn",
+        "email": "sales@shineehotels.com",
+        "contact_number": "+977-9802320952"
+      }
+    ]
+  }
+
+
+
+,
+  {
+    "itinerary_point": "Gorak Shep",
+    "latitude": 27.98056,
+    "longitude": 86.82861,
+    "police_stations": [
+      {
+        "name": "Gorak Shep Police Post (informal)",
+        "email": "sudeepkarki74@gmail.com",
+        "contact_number": "9808047844"
+      }
+    ],
+    "medical_facilities": [],
+    "lodges_hotels": []
+  }

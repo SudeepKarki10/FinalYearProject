@@ -29,6 +29,12 @@ export default function ProfileScreen() {
       case 'favorites':
         router.push('/favorites');
         break;
+      case 'transit-pass':
+        router.push('/transit-pass');
+        break;
+      case 'issued-tims':
+        router.push('/issued-tims');
+        break;
       default:
         break;
     }
@@ -113,10 +119,13 @@ export default function ProfileScreen() {
               <Ionicons name="heart-outline" size={24} color={colors.text} style={styles.activityIcon} />
               <Text style={styles.activityIconText}>Favorites</Text>
             </TouchableOpacity>
-            <View style={styles.activityItemGrid}>
-              <Ionicons name="flag-outline" size={24} color={colors.text} style={styles.activityIcon} />
-              <Text style={styles.activityIconText}>Completed</Text>
-            </View>
+            <TouchableOpacity 
+              style={styles.activityItemGrid}
+              onPress={() => handleActivityPress('issued-tims')}
+            >
+              <Ionicons name="document-text-outline" size={24} color={colors.text} style={styles.activityIcon} />
+              <Text style={styles.activityIconText}>Issued Passes</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.activityRow}>
             <View style={styles.activityItemGrid}>
@@ -237,6 +246,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activityIcon: {
+    padding : 0,
     marginBottom: 8,
   },
   activityIconText: {

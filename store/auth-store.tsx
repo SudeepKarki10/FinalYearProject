@@ -2,12 +2,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-const API_BASE_URL = "http://192.168.0.101:8000/api";
+const API_BASE_URL = "http://192.168.18.4:8000/api/";
 
 export type UserInterests = string[];
 
 interface User {
-  id: number;  // Backend always sends numeric ID
+  id: number;  
   username: string;
   email: string;
   display_name: string;
@@ -56,7 +56,7 @@ export const useAuthStore = create<AuthState>()(
   set({ isLoading: true, error: null, successMessage: null });
   
   try {
-    const response = await fetch(`${API_BASE_URL}/login/`, {
+    const response = await fetch(`${API_BASE_URL}login/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -113,7 +113,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null, successMessage: null });
         
         try {
-          const response = await fetch(`${API_BASE_URL}/signup/`, {
+          const response = await fetch(`${API_BASE_URL}signup/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, email, password, display_name, photo_url }),
@@ -214,7 +214,7 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           // Call a protected endpoint to verify token
-          const response = await fetch(`${API_BASE_URL}/verify-token`, {
+          const response = await fetch(`${API_BASE_URL}verify-token`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -294,7 +294,7 @@ export const useAuthStore = create<AuthState>()(
             }
           };
 
-          const response = await fetch(`${API_BASE_URL}/users/${user.id}/`, {
+          const response = await fetch(`${API_BASE_URL}users/${user.id}/`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -302,6 +302,8 @@ export const useAuthStore = create<AuthState>()(
             },
             body: JSON.stringify(data),
           });
+
+          console.log(response.body);
 
           if (!response.ok) {
             const errorData = await response.json();
