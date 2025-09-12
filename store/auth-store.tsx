@@ -1,8 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-
-const API_BASE_URL = "http://192.168.18.4:8000/api/";
+import { API_BASE_URL } from "../constants/config";
 
 export type UserInterests = string[];
 
@@ -32,12 +31,18 @@ interface AuthState {
   // Actions
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string, display_name: string, photo_url: string | null) => Promise<void>;
+  changePassword: (old_password: string, new_password: string) => Promise<boolean>;
+  forgotPassword: (email: string) => Promise<boolean>;
+  verifyOtp: (otp: string) => Promise<boolean>;
+  setNewPassword: (otp: string, new_password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
   clearSuccessMessage: () => void;
   initAuth: () => Promise<void>;
   checkTokenValidity: () => Promise<boolean>;
   updateUserInterests: (interests: UserInterests) => Promise<boolean | void>;
+  // Mark onboarding complete locally without network calls
+  completeOnboardingLocally: () => void;
 }
 
 
@@ -52,48 +57,53 @@ export const useAuthStore = create<AuthState>()(
       successMessage: null,
       hasCompletedOnboarding: false,
 
-     login: async (username, password) => {
+  login: async (username, password) => {
   set({ isLoading: true, error: null, successMessage: null });
   
   try {
-    const response = await fetch(`${API_BASE_URL}login/`, {
+  const response = await fetch(`${API_BASE_URL}auth/login/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
 
-    const data = await response.json();
-    console.log('Login response:', data);
+  const ct = response.headers.get('content-type') || '';
+  const rawText = await response.text();
+  const data = ct.includes('application/json') ? JSON.parse(rawText) : { raw: rawText } as any;
+  console.log('Login response:', data);
 
     if (!response.ok) {
       throw new Error(data.message || data.error || 'Login failed');
     }
 
     // Extract and transform nested user data
-    const { token, user: responseUser } = data;
+    const payload: any = (data && typeof data === 'object' && 'data' in data) ? (data as any).data : data;
+    const { token, user: responseUser } = payload;
+    const inner = responseUser?.user || responseUser; // support both nested and flat shapes
     const user: User = {
-      id: responseUser.user.id,
-      username: responseUser.user.username,
-      email: responseUser.user.email,
-      display_name: responseUser.display_name,
+      id: inner.id,
+      username: inner.username,
+      email: inner.email,
+      display_name: responseUser.display_name ?? inner.display_name ?? inner.username,
       photo_url: responseUser.photo_url || null,
       user: {
-        id: responseUser.user.id,
-        username: responseUser.user.username,
-        email: responseUser.user.email,
+        id: inner.id,
+        username: inner.username,
+        email: inner.email,
       },
       interests: responseUser.profile?.interests || [],
     };
 
     await AsyncStorage.setItem('auth_token', token);
 
+    // Always require onboarding after each successful login
     set({
       user,
       token,
       isAuthenticated: true,
       isLoading: false,
       successMessage: "Login successful!",
-      hasCompletedOnboarding: user.interests !== undefined,
+      hasCompletedOnboarding: false,
     });
 
   } catch (error:any) {
@@ -109,34 +119,38 @@ export const useAuthStore = create<AuthState>()(
      
     
 
-      register: async (username, email, password, display_name, photo_url) => {
+    register: async (username, email, password, display_name, photo_url) => {
         set({ isLoading: true, error: null, successMessage: null });
         
         try {
-          const response = await fetch(`${API_BASE_URL}signup/`, {
+  const response = await fetch(`${API_BASE_URL}auth/signup/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, email, password, display_name, photo_url }),
           });
 
-          const data = await response.json();
+  const ct = response.headers.get('content-type') || '';
+  const rawText = await response.text();
+  const data = ct.includes('application/json') ? JSON.parse(rawText) : { raw: rawText } as any;
 
           if (!response.ok) {
             throw new Error(data.message || data.error || 'Registration failed');
           }
 
           // Extract and transform nested user data
-          const { token, user: responseUser } = data;
+          const payload: any = (data && typeof data === 'object' && 'data' in data) ? (data as any).data : data;
+          const { token, user: responseUser } = payload;
+          const inner = responseUser?.user || responseUser;
           const user: User = {
-            id: responseUser.user.id,
-            username: responseUser.user.username,
-            email: responseUser.user.email,
-            display_name: responseUser.display_name,
+            id: inner.id,
+            username: inner.username,
+            email: inner.email,
+            display_name: responseUser.display_name ?? inner.display_name ?? inner.username,
             photo_url: responseUser.photo_url || null,
             user: {
-              id: responseUser.user.id,
-              username: responseUser.user.username,
-              email: responseUser.user.email,
+              id: inner.id,
+              username: inner.username,
+              email: inner.email,
             },
             interests: undefined, // New users don't have interests yet
           };
@@ -159,6 +173,94 @@ export const useAuthStore = create<AuthState>()(
             error: error.message || "Failed to register. Please try again.",
           });
           throw error;
+        }
+      },
+
+      changePassword: async (old_password, new_password) => {
+        const { token } = get();
+        if (!token) {
+          set({ error: 'Authentication required' });
+          return false;
+        }
+        set({ isLoading: true, error: null, successMessage: null });
+        try {
+          const resp = await fetch(`${API_BASE_URL}auth/change_password/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${token}`,
+            },
+            body: JSON.stringify({ old_password, new_password }),
+          });
+          const raw = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(raw?.message || raw?.error || 'Failed to change password');
+          }
+          set({ isLoading: false, successMessage: raw?.message || 'Password changed successfully' });
+          return true;
+        } catch (err: any) {
+          set({ isLoading: false, error: err?.message || 'Failed to change password' });
+          return false;
+        }
+      },
+
+      forgotPassword: async (email) => {
+        set({ isLoading: true, error: null, successMessage: null });
+        try {
+          const resp = await fetch(`${API_BASE_URL}auth/forgot_password/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const raw = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(raw?.message || raw?.error || 'Failed to request password reset');
+          }
+          set({ isLoading: false, successMessage: raw?.message || 'OTP sent to email' });
+          return true;
+        } catch (err: any) {
+          set({ isLoading: false, error: err?.message || 'Failed to request password reset' });
+          return false;
+        }
+      },
+
+      verifyOtp: async (otp) => {
+        set({ isLoading: true, error: null, successMessage: null });
+        try {
+          const resp = await fetch(`${API_BASE_URL}auth/verify_otp/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp }),
+          });
+          const raw = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(raw?.message || raw?.error || 'Failed to verify OTP');
+          }
+          set({ isLoading: false, successMessage: raw?.message || 'OTP verified' });
+          return true;
+        } catch (err: any) {
+          set({ isLoading: false, error: err?.message || 'Failed to verify OTP' });
+          return false;
+        }
+      },
+
+      setNewPassword: async (otp, new_password) => {
+        set({ isLoading: true, error: null, successMessage: null });
+        try {
+          const resp = await fetch(`${API_BASE_URL}auth/set_new_password/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp, new_password }),
+          });
+          const raw = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(raw?.message || raw?.error || 'Failed to set new password');
+          }
+          set({ isLoading: false, successMessage: raw?.message || 'Password reset successful' });
+          return true;
+        } catch (err: any) {
+          set({ isLoading: false, error: err?.message || 'Failed to set new password' });
+          return false;
         }
       },
 
@@ -213,11 +315,11 @@ export const useAuthStore = create<AuthState>()(
         if (!token) return false;
 
         try {
-          // Call a protected endpoint to verify token
-          const response = await fetch(`${API_BASE_URL}verify-token`, {
+          // Call a protected endpoint to verify token (tims list requires auth)
+          const response = await fetch(`${API_BASE_URL}tims/`, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': `Token ${token}`,
               'Content-Type': 'application/json',
             },
           });
@@ -287,11 +389,14 @@ export const useAuthStore = create<AuthState>()(
           // Ensure interests is an array
           const safeInterests = Array.isArray(interests) ? interests : [];
           
-          // Send the interests array directly in the profile
+          // Structure data to match backend's UserSerializer and UserProfileSerializer expectation
           const data = {
-            "profile": {
-              "interests": safeInterests // Django will handle the JSON serialization
-            }
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            display_name: user.display_name,
+            interests: safeInterests, // Send at root level as backend expects
+            photo_url: user.photo_url
           };
 
           const response = await fetch(`${API_BASE_URL}users/${user.id}/`, {
@@ -312,11 +417,11 @@ export const useAuthStore = create<AuthState>()(
 
           const updatedUser = await response.json();
           
-          // Safely update the user object
+          // Safely update the user object with interests from either location
           set({ 
             user: { 
               ...user, 
-              interests: updatedUser?.profile?.interests || [] 
+              interests: updatedUser?.interests || updatedUser?.profile?.interests || []
             },
             hasCompletedOnboarding: true 
           });
@@ -328,6 +433,15 @@ export const useAuthStore = create<AuthState>()(
           set({ hasCompletedOnboarding: true });
           return false;
         }
+      },
+      
+      // Locally mark onboarding as complete without contacting the server
+      completeOnboardingLocally: () => {
+        const current = get().user;
+        set({
+          user: current ? { ...current } : current,
+          hasCompletedOnboarding: true,
+        });
       },
     }),
     {
@@ -346,7 +460,7 @@ export const useAuthStore = create<AuthState>()(
 export const getAuthHeaders = () => {
   const store = useAuthStore.getState();
   return {
-    'Authorization': `Bearer ${store.token}`,
+    'Authorization': `Token ${store.token}`,
     'Content-Type': 'application/json',
   };
 };
@@ -362,7 +476,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
   return fetch(url, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${store.token}`,
+      'Authorization': `Token ${store.token}`,
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },

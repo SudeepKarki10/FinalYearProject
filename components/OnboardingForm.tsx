@@ -59,7 +59,7 @@ const INTEREST_CATEGORIES: InterestCategory[] = [
 ];
 
 export default function OnboardingForm() {
-  const { updateUserInterests } = useAuthStore();
+  const { updateUserInterests, completeOnboardingLocally } = useAuthStore();
   const { fetchRecommendedTreks } = useTrekStore();
   const [selectedInterests, setSelectedInterests] = useState<UserInterests>([]);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -83,49 +83,77 @@ export default function OnboardingForm() {
     if (isNavigating) return; // Prevent multiple submissions
     
     setIsNavigating(true);
+    let recommendationsFetched = false;
     
     try {
       // Only update interests if user has selected some
       if (selectedInterests.length > 0) {
         console.log('Updating user interests:', selectedInterests);
-        await updateUserInterests(selectedInterests);
-        console.log('User interests updated successfully');
+        const updateResult = await updateUserInterests(selectedInterests);
+        console.log('User interests update result:', updateResult);
         
-        // Fetch recommendations after interests are updated
-        try {
-          console.log('Fetching recommendations with new interests...');
-          await fetchRecommendedTreks();
-          console.log('Recommendations fetched successfully');
-        } catch (recError) {
-          console.error('Failed to fetch recommendations:', recError);
-          // Don't block navigation if recommendations fail
+        // Proceed with recommendations if we got any kind of successful response
+        if (updateResult) {
+          console.log('User interests updated successfully, fetching recommendations...');
+          try {
+            // Wait a bit longer to ensure backend has processed the interest update
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await fetchRecommendedTreks();
+            console.log('Recommendations fetched successfully');
+            recommendationsFetched = true;
+          } catch (recError) {
+            console.error('Failed to fetch recommendations:', recError);
+            // Log more details about the error
+            if (recError instanceof Error) {
+              console.error('Error details:', {
+                message: recError.message,
+                name: recError.name,
+                stack: recError.stack
+              });
+            }
+          }
+        } else {
+          console.warn('Interest update may not have succeeded:', updateResult);
         }
       } else {
         console.log('Skipping without interests...');
+        // Mark onboarding complete locally when no interests are chosen
+        completeOnboardingLocally();
       }
     } catch (error) {
-      console.error('Failed to update interests:', error);
-      // Don't return here - still navigate even if API fails
+      console.error('Failed in onboarding process:', error);
+      // Log more details about the error
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+      }
+      // Ensure onboarding is marked complete locally so UI can proceed
+      completeOnboardingLocally();
     }
     
-    // Always navigate regardless of API success/failure
-    setTimeout(() => {
-      try {
-        console.log('Navigating to tabs...');
-        replace('/(tabs)');
-      } catch (navError) {
-        console.error('Navigation error:', navError);
-        setIsNavigating(false);
+    // Only navigate after ensuring recommendations are fetched or there was an error
+    try {
+      // If we successfully fetched recommendations, wait a moment to ensure they're processed
+      if (recommendationsFetched) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
-    }, 500);
-
-    // Safety timeout to reset navigation state
-    setTimeout(() => {
-      if (isNavigating) {
-        console.log('Navigation timeout - resetting state');
-        setIsNavigating(false);
+      console.log('Navigating to tabs...');
+      replace('/(tabs)');
+    } catch (navError) {
+      console.error('Navigation error:', navError);
+      if (navError instanceof Error) {
+        console.error('Navigation error details:', {
+          message: navError.message,
+          name: navError.name,
+          stack: navError.stack
+        });
       }
-    }, 2000);
+    } finally {
+      setIsNavigating(false);
+    }
   };
 
   const renderCategory = (category: InterestCategory) => (
@@ -162,8 +190,8 @@ const handleSkip = async () => {
   
   try {
     console.log('Skipping onboarding...');
-    // Mark onboarding as complete even when skipping
-    await updateUserInterests([]); // This will set hasCompletedOnboarding to true
+  // Mark onboarding complete locally without API calls
+  completeOnboardingLocally();
     replace('/(tabs)');
   } catch (navError) {
     console.error('Navigation error:', navError);

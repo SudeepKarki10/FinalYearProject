@@ -15,16 +15,24 @@ import { useTrekStore } from "../../store/trek-store";
 
 export default function FavoritesScreen() {
   const router = useRouter();
-  const { favoriteTreks, fetchFavorites, fetchTreks } = useTrekStore();
+  const { favoriteTreks, fetchFavorites, fetchTreks, loading, error } = useTrekStore();
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
-  useEffect(() => {
-    // First fetch all treks, then fetch favorites
-    const loadData = async () => {
+  const loadData = React.useCallback(async () => {
+    try {
+      console.log('Loading favorites data...');
       await fetchTreks();
       await fetchFavorites();
-    };
-    loadData();
+      console.log('Favorites loaded:', favoriteTreks.length);
+    } catch (err) {
+      console.error('Error loading favorites:', err);
+    }
   }, [fetchTreks, fetchFavorites]);
+
+  // Initial load
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleTrekPress = (trekId: number) => {
     router.push(`/trek/${trekId}`);
@@ -41,7 +49,21 @@ export default function FavoritesScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {favoriteTreks.length === 0 ? (
+        {loading && favoriteTreks.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="sync" size={48} color={colors.textSecondary} />
+            <Text style={styles.emptyStateText}>Loading favorites...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+            <Text style={styles.emptyStateText}>Error loading favorites</Text>
+            <Text style={styles.emptyStateSubtext}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : favoriteTreks.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="heart-outline" size={48} color={colors.textSecondary} />
             <Text style={styles.emptyStateText}>No favorite treks yet</Text>
@@ -106,6 +128,18 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 10,
     backgroundColor: colors.background,
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
   headerText: {
     fontSize: 28,

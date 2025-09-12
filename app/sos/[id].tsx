@@ -49,13 +49,22 @@ export default function AlertDetailsPage() {
   const fetchAlertDetails = useCallback(async () => {
     try {
       setIsLoading(true);
+      console.log('Fetching SOS alert details for ID:', id);
       const { data, error: fetchError } = await fetchSOSAlertDetails(id, token || '');
       
       if (fetchError) {
+        console.error('Error fetching SOS alert:', fetchError);
         setError(fetchError);
       } else if (data) {
+        console.log('SOS alert data received:', data);
         setAlert(data);
+      } else {
+        console.error('No data received for SOS alert');
+        setError('Alert not found');
       }
+    } catch (err) {
+      console.error('Unexpected error fetching SOS alert:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -159,6 +168,18 @@ export default function AlertDetailsPage() {
         </Text>
       </View>
 
+      {/* Description */}
+      {Boolean(alert.description) && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            <Ionicons name="document-text-outline" size={20} color={colors.primary} /> Description
+          </Text>
+          <View style={styles.descriptionCard}>
+            <Text style={styles.descriptionText}>{alert.description}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Quick Call Section */}
       {phoneNumbers.length > 0 && (
         <View style={styles.section}>
@@ -184,6 +205,11 @@ export default function AlertDetailsPage() {
           <Ionicons name="warning-outline" size={20} color={colors.primary} /> Emergency Types
         </Text>
         <View style={styles.chipContainer}>
+          {alert.emergency_type && (
+            <View style={[styles.chip, { backgroundColor: colors.error + '20' }]}>
+              <Text style={[styles.chipText, { color: colors.error }]}>Primary: {alert.emergency_type}</Text>
+            </View>
+          )}
           {alert.selected_types.map((type, index) => (
             <View key={index} style={styles.chip}>
               <Text style={styles.chipText}>{type}</Text>
@@ -201,6 +227,12 @@ export default function AlertDetailsPage() {
           <Text style={styles.locationText}>
             {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
           </Text>
+          <TouchableOpacity
+            onPress={() => Linking.openURL(`https://maps.google.com/?q=${alert.latitude},${alert.longitude}`)}
+            style={{ marginTop: 8 }}
+          >
+            <Text style={{ color: colors.primary, fontWeight: '600' }}>Open in Maps</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -400,5 +432,17 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 16,
     textAlign: 'center',
+  },
+  descriptionCard: {
+    backgroundColor: colors.card,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  descriptionText: {
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 20,
   },
 });

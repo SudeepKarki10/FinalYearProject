@@ -1,4 +1,5 @@
 import { colors } from '@/constants/Colors';
+import { API_BASE_URL } from '@/constants/config';
 import TIMS from '@/constants/TIMS';
 import { useAuthStore } from '@/store/auth-store';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,25 +9,26 @@ import { useRouter } from 'expo-router';
 import { CheckCircle, User } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    View as ImageView,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  View as ImageView,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import DropdownSelect from 'react-native-input-select';
 
 
 interface TrekOption {
   id?: string;
+  trek_id: number;
   label: string;
   value: string;
   costs: Record<string, number>;
@@ -44,6 +46,7 @@ interface FormData {
   passport_number: string;
   gender: string;
   date_of_birth: Date;
+  trek_id: number;
   trekker_area: string;
   route: string;
   entry_date: Date;
@@ -68,9 +71,6 @@ interface FormData {
   user?: number | null; // Set on backend
 }
 
-const API_BASE_URL = "http://192.168.18.4:8000/api/";
-// Remove incorrect destructuring and await
-
 export default function TransitPassScreen() {
   const router = useRouter();
   const authStore = useAuthStore();
@@ -83,6 +83,7 @@ export default function TransitPassScreen() {
     passport_number: '',
     gender: '',
     date_of_birth: new Date(),
+    trek_id: 0,
     trekker_area: '',
     route: '',
     entry_date: new Date(),
@@ -118,6 +119,7 @@ export default function TransitPassScreen() {
   const trekOptions: TrekOption[] = TIMS.map(trek => ({
     label: trek.name,
     value: trek.name,
+    trek_id: trek.id,
     costs: Object.fromEntries(
       Object.entries(trek.Transit_Pass_Cost).filter(([_, v]) => typeof v === 'number')
     ),
@@ -187,6 +189,7 @@ export default function TransitPassScreen() {
     const selectedTrek = TIMS.find(trek => trek.name === item.value);
     setFormData(prev => ({
       ...prev,
+      trek_id: item.trek_id,
       trekker_area: item.value,
       route: selectedTrek ? selectedTrek.trekker_area : item.value,
       permit_cost: item.total
@@ -199,12 +202,16 @@ export default function TransitPassScreen() {
     selectedDate: Date | undefined,
     field: keyof Pick<FormData, 'date_of_birth' | 'entry_date' | 'exit_date'>
   ) => {
-    setShowDatePicker('');
-    if (selectedDate) {
-      setFormData(prev => ({
-        ...prev,
-        [field]: selectedDate
-      }));
+    if (event.type === 'set') {
+      setShowDatePicker('');
+      if (selectedDate) {
+        setFormData(prev => ({
+          ...prev,
+          [field]: selectedDate
+        }));
+      }
+    } else {
+      setShowDatePicker('');
     }
   };
 
@@ -230,23 +237,27 @@ export default function TransitPassScreen() {
     }
 
     try {
+      // Log the request data for debugging
+      const requestData = {
+        ...formData,
+        transit_pass_cost: transitPassCost,
+        date_of_birth: formData.date_of_birth.toISOString().split('T')[0],
+        entry_date: formData.entry_date.toISOString().split('T')[0],
+        exit_date: formData.exit_date.toISOString().split('T')[0],
+        issue_date: new Date().toISOString().split('T')[0],
+        permit_cost: Number(formData.permit_cost), // Send as number instead of string
+        payment_status: 'pending',
+        status: 'pending'
+      };
+      console.log('Request Data:', requestData);
+
       const response = await fetch(`${API_BASE_URL}tims/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Token ${token}`, 
         },
-        body: JSON.stringify({
-          ...formData,
-          transit_pass_cost: transitPassCost,
-          date_of_birth: formData.date_of_birth.toISOString().split('T')[0],
-          entry_date: formData.entry_date.toISOString().split('T')[0],
-          exit_date: formData.exit_date.toISOString().split('T')[0],
-          issue_date: new Date().toISOString().split('T')[0], // Send only date part
-          permit_cost: String(formData.permit_cost), // Ensure it's a string
-          payment_status: 'pending',
-          status: 'pending'
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
@@ -256,18 +267,16 @@ export default function TransitPassScreen() {
           statusText: response.statusText,
           data: errorData
         });
-        console.log("PAss data: ", {
-          ...formData,
-          transit_pass_cost: transitPassCost,
-          date_of_birth: formData.date_of_birth.toISOString().split('T')[0],
-          entry_date: formData.entry_date.toISOString().split('T')[0],
-          exit_date: formData.exit_date.toISOString().split('T')[0],
-          issue_date: new Date().toISOString().split('T')[0],
-          permit_cost: String(formData.permit_cost),
-          payment_status: 'pending',
-          status: 'pending'
-        });
-        throw new Error(`Server Error: ${response.status} ${response.statusText}`);
+        
+        // Create a more detailed error message
+        let errorMessage = `Server Error: ${response.status} ${response.statusText}\n`;
+        if (errorData) {
+          errorMessage += '\nDetails:\n';
+          Object.entries(errorData).forEach(([key, value]) => {
+            errorMessage += `${key}: ${value}\n`;
+          });
+        }
+        throw new Error(errorMessage);
       }
 
       Alert.alert('Success', 'TIMS application submitted successfully');
@@ -392,6 +401,19 @@ export default function TransitPassScreen() {
               Date of Birth: {formData.date_of_birth.toLocaleDateString()}
             </Text>
           </TouchableOpacity>
+          {(showDatePicker === 'date_of_birth' || Platform.OS === 'ios') && (
+            <DateTimePicker
+              testID="dateOfBirthPicker"
+              value={formData.date_of_birth}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, date) => handleDateChange(event, date, 'date_of_birth')}
+              textColor={colors.text}
+              themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
+              accentColor={colors.primary}
+              style={{ backgroundColor: colors.card, width: '100%' }}
+            />
+          )}
 
           <Text style={styles.sectionTitle}>Trek Information</Text>
 
@@ -428,6 +450,19 @@ export default function TransitPassScreen() {
               Entry Date: {formData.entry_date.toLocaleDateString()}
             </Text>
           </TouchableOpacity>
+          {(showDatePicker === 'entry_date' || Platform.OS === 'ios') && (
+            <DateTimePicker
+              testID="entryDatePicker"
+              value={formData.entry_date}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, date) => handleDateChange(event, date, 'entry_date')}
+              textColor={colors.text}
+              themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
+              accentColor={colors.primary}
+              style={{ backgroundColor: colors.card, width: '100%' }}
+            />
+          )}
 
           <TouchableOpacity
             style={styles.dateButton}
@@ -437,6 +472,19 @@ export default function TransitPassScreen() {
               Exit Date: {formData.exit_date.toLocaleDateString()}
             </Text>
           </TouchableOpacity>
+          {(showDatePicker === 'exit_date' || Platform.OS === 'ios') && (
+            <DateTimePicker
+              testID="exitDatePicker"
+              value={formData.exit_date}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(event, date) => handleDateChange(event, date, 'exit_date')}
+              textColor={colors.text}
+              themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
+              accentColor={colors.primary}
+              style={{ backgroundColor: colors.card, width: '100%' }}
+            />
+          )}
 
           <Text style={styles.sectionTitle}>Nepal Contact</Text>
 
@@ -551,15 +599,6 @@ export default function TransitPassScreen() {
             <Text style={styles.submitButtonText}>Submit Application</Text>
           </TouchableOpacity>
         </ScrollView>
-
-        {showDatePicker !== '' && (
-          <DateTimePicker
-            value={formData[showDatePicker]}
-            mode="date"
-            display="default"
-            onChange={(event, date) => handleDateChange(event, date, showDatePicker)}
-          />
-        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

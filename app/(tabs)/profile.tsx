@@ -128,10 +128,13 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <View style={styles.activityRow}>
-            <View style={styles.activityItemGrid}>
-              <Ionicons name="star-outline" size={24} color={colors.text} style={styles.activityIcon} />
-              <Text style={styles.activityIconText}>Reviews</Text>
-            </View>
+            <TouchableOpacity 
+              style={styles.activityItemGrid}
+              onPress={() => router.push('/profile/manage-posts')}
+            >
+              <Ionicons name="images-outline" size={24} color={colors.text} style={styles.activityIcon} />
+              <Text style={styles.activityIconText}>My Posts</Text>
+            </TouchableOpacity>
             <View style={styles.activityItemGrid}>
               <Ionicons name="bookmark-outline" size={24} color={colors.text} style={styles.activityIcon} />
               <Text style={styles.activityIconText}>Saved</Text>

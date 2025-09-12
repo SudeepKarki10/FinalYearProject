@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { API_BASE_URL } from '../constants/config';
 
 interface Trek {
   id: number;
@@ -48,8 +49,6 @@ interface TrekDetailStore {
   isFavorite: (trekId: number) => boolean;
 }
 
-const API_BASE_URL = "http://192.168.18.4:8000/api/";
-
 export const useTrekDetailStore = create<TrekDetailStore>((set, get) => ({
   currentTrek: null,
   favoriteIds: new Set<number>(),
@@ -66,7 +65,8 @@ export const useTrekDetailStore = create<TrekDetailStore>((set, get) => ({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data: Trek = await response.json();
+  const raw = await response.json();
+  const data: Trek = (raw && typeof raw === 'object' && 'data' in raw) ? raw.data : raw;
       
       set({
         currentTrek: data,

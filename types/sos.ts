@@ -25,6 +25,8 @@ export interface SOSAlert {
   id: number;
   latitude: number;
   longitude: number;
+  description?: string;
+  emergency_type?: string | string[];
   selected_types: string[];
   contacted_services: ContactService[];
   google_places_data: GooglePlace[];

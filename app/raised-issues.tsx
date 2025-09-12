@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import SosCard, { SOSAlert } from '../components/SosCard';
 import { colors } from '../constants/Colors';
-import { useAuthStore } from '../store/auth-store'; // Assuming you have an auth store for token management
-
-
-const API_BASE_URL = "http://192.168.18.4:8000/api/";
+import { API_BASE_URL } from '../constants/config';
+import { useAuthStore } from '../store/auth-store';
 
 export default function RaisedIssuesScreen() {
   const [isLoading, setIsLoading] = useState(true);
@@ -20,7 +18,7 @@ export default function RaisedIssuesScreen() {
   const fetchAlerts = async () => {
     const {token} = useAuthStore.getState(); 
     try {
-      const response = await fetch(`${API_BASE_URL}sos-alerts/`, {
+      const response = await fetch(`${API_BASE_URL}sos/`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

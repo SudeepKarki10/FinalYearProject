@@ -15,7 +15,7 @@ import {
   View
 } from "react-native";
 import { colors } from "../../constants/Colors";
-import { useSOSAlert } from '../../store/map-store';
+import { useSOSAlert } from '../../store/sosalert-store';
 
 // Emergency issue types and help options
 const ISSUE_TYPES = [
@@ -163,7 +163,9 @@ export default function ExploreScreen() {
       const response = await sendSOSAlert(
         location.lat,
         location.lng,
-        [...selectedHelpOptions, ...selectedIssueTypes] // Include both help options and issue types
+        selectedHelpOptions, // services to contact
+        selectedIssueTypes,   // emergency types
+        description.trim()
       );
 
       console.log(JSON.stringify(response));

@@ -6,22 +6,23 @@ import { useRouter } from 'expo-router';
 import { CheckCircle, User } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  View as ImageView,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    View as ImageView,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import DropdownSelect from 'react-native-input-select';
 import { colors } from '../constants/Colors';
+import { API_BASE_URL } from '../constants/config';
 import TIMS from '../constants/TIMS';
 
 
@@ -67,9 +68,6 @@ interface FormData {
   updated_at?: Date; // Set on backend
   user?: number | null; // Set on backend
 }
-
-const API_BASE_URL = "http://192.168.18.4:8000/api/";
-// Remove incorrect destructuring and await
 
 export default function TransitPassScreen() {
   const router = useRouter();
