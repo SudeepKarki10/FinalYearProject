@@ -1,7 +1,7 @@
 import { Alert } from 'react-native';
 import { create } from 'zustand';
 import { API_BASE_URL } from '../constants/config';
-import { Post } from '../types/post';
+import { Comment, Post } from '../types/post';
 import { getAuthHeaders } from './auth-store';
 
 interface SocialStore {
@@ -10,9 +10,11 @@ interface SocialStore {
   userPost: string;
   fetchPosts: () => Promise<void>;
   setUserPost: (text: string) => void;
-  createPost: (caption: string, image?: string, trekId?: number) => Promise<void>;
+  createPost: (caption: string, image?: string, trekId?: number | null) => Promise<void>;
   likePost: (postId: number) => Promise<void>;
   deletePost: (postId: number) => Promise<void>;
+  addComment: (postId: number, content: string, parentCommentId?: number | null) => Promise<void>;
+  fetchComments: (postId: number) => Promise<Comment[]>;
 }
 
 export const useSocialStore = create<SocialStore>((set, get) => ({
@@ -33,28 +35,61 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
         return;
       }
       
+      console.log('Fetching social posts from:', `${API_BASE_URL}posts/`);
+      
       const response = await fetch(`${API_BASE_URL}posts/`, {
         headers,
       });
       
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
-      if (data.success) {
-        set({ posts: data.data });
+      const responseData = await response.json();
+      console.log('Social posts API response:', responseData);
+      
+      // Check if the response is an array directly (not wrapped in data/success properties)
+      const postsArray = Array.isArray(responseData) ? responseData : 
+        responseData.success && responseData.data ? responseData.data : [];
+      
+      if (postsArray && postsArray.length > 0) {
+        // Format posts to match the Post interface
+        const formattedPosts: Post[] = postsArray.map((post: any) => ({
+          id: post.id,
+          user: {
+            id: post.user?.id || 0,
+            displayName: post.user?.display_name || 'Unknown User',
+            photoUrl: post.user?.photo_url
+          },
+          caption: post.content || '',
+          image: post.images && post.images.length > 0 ? post.images[0] : undefined,
+          location: post.location ? {
+            placeName: post.location.place_name || '',
+            latitude: post.location.latitude || 0,
+            longitude: post.location.longitude || 0
+          } : undefined,
+          likesCount: post.likes_count || 0,
+          commentsCount: post.comments_count || 0,
+          isLiked: post.is_liked || false,
+          createdAt: post.created_at || new Date().toISOString()
+        }));
+        
+        console.log('Formatted posts:', formattedPosts.length);
+        set({ posts: formattedPosts });
       } else {
-        Alert.alert('Error', data.error || 'Failed to load posts');
+        console.log('No posts found in API response');
+        set({ posts: [] });
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load posts';
-      Alert.alert('Error', errorMessage);
-      console.error(error);
+      console.error('Error fetching posts:', error);
+      // Don't show an alert for network errors to avoid disrupting the user experience
+      set({ posts: [] });
     } finally {
       set({ isLoading: false });
     }
   },
 
-  createPost: async (caption: string, image?: string, trekId: number = 1) => {
-    // Using trek ID 1 as the default "General" trek for non-trek-specific posts
+  createPost: async (caption: string, image?: string, trekId?: number | null) => {
     try {
       set({ isLoading: true });
       
@@ -67,15 +102,13 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
       
       // Prepare payload according to API documentation
       const postData = {
-        // Use provided trekId parameter
-        trek: trekId,
+        // Use trekId if provided, otherwise null
+        trek: trekId || null,
         // Use caption as content
         content: caption,
         // Convert single image to array if present
         images: image ? [image] : []
       };
-      
-      console.log('Sending post data:', JSON.stringify(postData));
       
       console.log('Sending post data:', postData);
       
@@ -111,6 +144,18 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
         return;
       }
       
+      // Find the post to determine if it's already liked
+      const posts = get().posts;
+      const post = posts.find(p => p.id === postId);
+      
+      if (!post) {
+        console.log(`Post with ID ${postId} not found in state`);
+        return;
+      }
+      
+      const isCurrentlyLiked = post.isLiked;
+      console.log(`Toggling like for post ${postId}. Currently liked: ${isCurrentlyLiked}`);
+      
       const response = await fetch(`${API_BASE_URL}posts/${postId}/like/`, {
         method: 'POST',
         headers,
@@ -118,18 +163,20 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
 
       if (response.ok) {
         // Update the post in the local state
-        const posts = get().posts;
         const updatedPosts = posts.map(post =>
           post.id === postId
-            ? { ...post, likesCount: post.likesCount + 1 }
+            ? { 
+                ...post, 
+                isLiked: !isCurrentlyLiked,
+                likesCount: isCurrentlyLiked ? Math.max(0, post.likesCount - 1) : post.likesCount + 1
+              }
             : post
         );
         set({ posts: updatedPosts });
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to like post';
-      Alert.alert('Error', errorMessage);
-      console.error(error);
+      console.error('Error toggling like:', error);
+      // Don't show an alert for like failures to avoid disrupting UX
     }
   },
 
@@ -159,6 +206,134 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete post';
       Alert.alert('Error', errorMessage);
       console.error(error);
+    }
+  },
+  
+  addComment: async (postId: number, content: string, parentCommentId?: number | null) => {
+    try {
+      const headers = getAuthHeaders();
+      if (!headers.Authorization) {
+        console.log('No authentication token found');
+        Alert.alert('Authentication Error', 'Please log in again');
+        return;
+      }
+      
+      if (!content.trim()) {
+        console.log('Comment content is empty');
+        return;
+      }
+      
+      console.log(`Adding comment to post ${postId}: ${content}`);
+      
+      // Based on backend code, the correct endpoint is /api/comments/
+      const url = `${API_BASE_URL}comments/`;
+      console.log('Calling API endpoint:', url);
+      
+      // Send the payload with post ID included
+      const payload = {
+        content,
+        post: postId,
+        ...(parentCommentId && { parent: parentCommentId })
+      };
+      console.log('With payload:', payload);
+      
+      // Use the correct endpoint for adding comments
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        // Log more details about the error
+        console.log(`Error response status: ${response.status}`);
+        console.log(`Error response URL: ${response.url}`);
+        try {
+          const errorText = await response.text();
+          console.log('Error response body:', errorText);
+        } catch {
+          console.log('Could not read error response body');
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Comment added response:', data);
+      
+      // Update comment count in the local state
+      const posts = get().posts;
+      const updatedPosts = posts.map(post =>
+        post.id === postId
+          ? { ...post, commentsCount: post.commentsCount + 1 }
+          : post
+      );
+      set({ posts: updatedPosts });
+      
+      return data;
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      throw error; // Re-throw to allow the UI to handle the error
+    }
+  },
+  
+  fetchComments: async (postId: number) => {
+    try {
+      const headers = getAuthHeaders();
+      if (!headers.Authorization) {
+        console.log('No authentication token found');
+        Alert.alert('Authentication Error', 'Please log in again');
+        return [];
+      }
+      
+      console.log(`Fetching comments for post ${postId}`);
+      
+      // Fetch the complete post data which includes comments
+      const response = await fetch(`${API_BASE_URL}posts/${postId}/`, {
+        headers,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('Post data with comments:', responseData);
+      
+      // Extract comments array from the post data
+      const commentsArray = responseData.comments || [];
+      
+      // Format comments to match the Comment interface, including replies
+      const formattedComments: Comment[] = commentsArray.map((comment: any) => ({
+        id: comment.id,
+        user: {
+          id: comment.user?.id || 0,
+          displayName: comment.user?.display_name || 'Unknown User',
+          photoUrl: comment.user?.photo_url
+        },
+        content: comment.content || '',
+        createdAt: comment.created_at || new Date().toISOString(),
+        // Format replies if they exist
+        replies: comment.replies?.map((reply: any) => ({
+          id: reply.id,
+          user: {
+            id: reply.user?.id || 0,
+            displayName: reply.user?.display_name || 'Unknown User',
+            photoUrl: reply.user?.photo_url
+          },
+          content: reply.content || '',
+          createdAt: reply.created_at || new Date().toISOString(),
+          parent: reply.parent
+        })) || []
+      }));
+      
+      console.log('Formatted comments:', formattedComments.length);
+      return formattedComments;
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      return [];
     }
   },
 }));

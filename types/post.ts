@@ -1,3 +1,16 @@
+export interface Comment {
+  id: number;
+  user: {
+    id: number;
+    displayName: string;
+    photoUrl?: string;
+  };
+  content: string;
+  createdAt: string;
+  replies?: Comment[];
+  parent?: number | null;
+}
+
 export interface Post {
   id: number;
   user: {
@@ -16,4 +29,5 @@ export interface Post {
   commentsCount: number;
   isLiked: boolean;
   createdAt: string;
+  comments?: Comment[];
 }

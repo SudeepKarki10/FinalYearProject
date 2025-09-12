@@ -4,8 +4,10 @@ import { Alert, FlatList, StyleSheet, TouchableOpacity, View } from 'react-nativ
 import { ThemedText } from '../../components/ThemedText';
 import { ThemedView } from '../../components/ThemedView';
 import { IconSymbol } from '../../components/ui/IconSymbol';
+import { API_BASE_URL } from '../../constants/config';
 import { usePosts } from '../../hooks/usePosts';
 import { useSafeThemeColor } from '../../hooks/useSafeThemeColor';
+import { getAuthHeaders } from '../../store/auth-store';
 import { Post } from '../../types/post';
 
 export default function ManagePostsScreen() {
@@ -14,22 +16,29 @@ export default function ManagePostsScreen() {
 
   const handleDelete = async (postId: number) => {
     try {
-      const response = await fetch(`YOUR_API_URL/api/posts/${postId}/`, {
+      const headers = getAuthHeaders();
+      if (!headers.Authorization) {
+        console.log('No authentication token found');
+        Alert.alert('Authentication Error', 'Please log in again');
+        return;
+      }
+      
+      const response = await fetch(`${API_BASE_URL}posts/${postId}/`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': 'Token YOUR_AUTH_TOKEN',
-        },
+        headers,
       });
 
       if (response.ok) {
         refreshPosts();
+        Alert.alert('Success', 'Post deleted successfully');
       } else {
         const data = await response.json();
         Alert.alert('Error', data.error || 'Failed to delete post');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to delete post');
-      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete post';
+      Alert.alert('Error', errorMessage);
+      console.error('Error deleting post:', error);
     }
   };
 
@@ -40,13 +49,21 @@ export default function ManagePostsScreen() {
         onPress={() => router.push(`../posts/${item.id}`)}
       >
         <View>
-          <ThemedText style={styles.caption}>{item.caption}</ThemedText>
-          <ThemedText style={styles.timestamp}>{item.createdAt}</ThemedText>
+          <ThemedText style={styles.caption} numberOfLines={2}>
+            {item.caption}
+          </ThemedText>
+          <ThemedText style={styles.timestamp}>
+            {new Date(item.createdAt).toLocaleDateString()}
+          </ThemedText>
         </View>
         
         <View style={styles.stats}>
           <View style={styles.stat}>
-            <IconSymbol name="heart" size={16} color={textColor} />
+            <IconSymbol 
+              name={item.isLiked ? "heart.fill" : "heart"} 
+              size={16} 
+              color={item.isLiked ? "#ff2d55" : textColor} 
+            />
             <ThemedText style={styles.statText}>{item.likesCount}</ThemedText>
           </View>
           <View style={styles.stat}>
@@ -76,7 +93,7 @@ export default function ManagePostsScreen() {
       </View>
 
       <FlatList
-        data={posts}
+        data={posts as Post[]}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
         refreshing={isLoading}

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeThemeColor } from '../../hooks/useSafeThemeColor';
 import { Post } from '../../types/post';
 import { ThemedText } from '../ThemedText';
@@ -10,13 +10,24 @@ interface PostCardProps {
   post: Post;
   onPress?: () => void;
   onLike?: () => void;
+  onComment?: (postId: number, comment: string) => void;
+  onViewComments?: (postId: number) => void;
+  onToggleComment?: (postId: number) => void;
+  showCommentInput?: boolean;
 }
 
-export function PostCard({ post, onPress, onLike }: PostCardProps) {
+export function PostCard({ post, onPress, onLike, onComment, onViewComments, onToggleComment, showCommentInput = false }: PostCardProps) {
   const iconColor = useSafeThemeColor({}, 'text');
+  const [newComment, setNewComment] = useState('');
+  const [isLiked, setIsLiked] = useState(post.isLiked);
 
+  const handleLike = () => {
+    setIsLiked(!isLiked);
+    if (onLike) onLike();
+  };
+  
   return (
-    <TouchableOpacity onPress={onPress}>
+    <View>
       <ThemedView style={styles.container}>
         <View style={styles.header}>
           <View style={styles.userInfo}>
@@ -37,22 +48,28 @@ export function PostCard({ post, onPress, onLike }: PostCardProps) {
         </View>
 
         {post.image && (
-          <Image
-            source={{ uri: post.image }}
-            style={styles.image}
-            resizeMode="cover"
-          />
+          <TouchableOpacity onPress={onPress}>
+            <Image
+              source={{ uri: post.image }}
+              style={styles.image}
+              resizeMode="cover"
+              onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
+            />
+          </TouchableOpacity>
         )}
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={onLike}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
             <IconSymbol 
-              name={post.isLiked ? "heart.fill" : "heart"} 
+              name={isLiked ? "heart.fill" : "heart"} 
               size={24} 
-              color={post.isLiked ? "#FF3B30" : iconColor} 
+              color={isLiked ? "#FF3B30" : iconColor} 
             />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={onToggleComment ? () => onToggleComment(post.id) : onPress}
+          >
             <IconSymbol name="bubble.right" size={24} color={iconColor} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
@@ -60,20 +77,58 @@ export function PostCard({ post, onPress, onLike }: PostCardProps) {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
-          <ThemedText style={styles.likes}>{post.likesCount} likes</ThemedText>
-          <ThemedText style={styles.caption}>{post.caption}</ThemedText>
-          {post.commentsCount > 0 && (
-            <TouchableOpacity>
-              <ThemedText style={styles.viewComments}>
-                View all {post.commentsCount} comments
-              </ThemedText>
+        <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+          <View style={styles.content}>
+            <ThemedText style={styles.likes}>{post.likesCount} likes</ThemedText>
+            <ThemedText style={styles.caption}>{post.caption}</ThemedText>
+            
+            {post.commentsCount > 0 && (
+              <TouchableOpacity 
+                onPress={onViewComments ? () => onViewComments(post.id) : onPress}
+              >
+                <ThemedText style={styles.viewComments}>
+                  View all {post.commentsCount} comments
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+            
+            <ThemedText style={styles.timestamp}>
+              {new Date(post.createdAt).toLocaleDateString()}
+            </ThemedText>
+          </View>
+        </TouchableOpacity>
+        
+        {showCommentInput && (
+          <View style={styles.commentInputContainer}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Comment"
+              placeholderTextColor="#999"
+              value={newComment}
+              onChangeText={setNewComment}
+              onSubmitEditing={() => {
+                if (onComment && newComment.trim()) {
+                  onComment(post.id, newComment);
+                  setNewComment('');
+                }
+              }}
+              returnKeyType="send"
+            />
+            <TouchableOpacity 
+              style={styles.commentButton}
+              onPress={() => {
+                if (onComment && newComment.trim()) {
+                  onComment(post.id, newComment);
+                  setNewComment('');
+                }
+              }}
+            >
+              <IconSymbol name="arrow.up.circle.fill" size={24} color="#007AFF" />
             </TouchableOpacity>
-          )}
-          <ThemedText style={styles.timestamp}>{post.createdAt}</ThemedText>
-        </View>
+          </View>
+        )}
       </ThemedView>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -135,5 +190,25 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12,
     opacity: 0.5,
+  },
+  commentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 0.5,
+    borderTopColor: '#e0e0e0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  commentInput: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    fontSize: 14,
+    marginRight: 8,
+  },
+  commentButton: {
+    padding: 4,
   },
 });

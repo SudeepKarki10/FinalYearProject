@@ -1,7 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -16,6 +17,7 @@ import {
 import { useThemeColor } from '../../hooks/useThemeColor';
 import { useAuthStore } from '../../store/auth-store';
 import { useSocialStore } from '../../store/social-store';
+import { useTrekStore } from '../../store/trek-store';
 import { ThemedText } from '../ThemedText';
 import { IconSymbol } from '../ui/IconSymbol';
 
@@ -30,11 +32,21 @@ export function CreatePostModal({ visible, onClose, onPostSuccess }: CreatePostM
   const [media, setMedia] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedTrek, setSelectedTrek] = useState<{ id: number; name: string } | null>(null);
+  const [showTrekSelector, setShowTrekSelector] = useState(false);
   const { createPost } = useSocialStore();
   const { user } = useAuthStore();
+  const { treks, fetchTreks } = useTrekStore();
   const themeColor = useThemeColor({}, 'text');
   const background = useThemeColor({}, 'background');
   const cardBackground = useThemeColor({}, 'card');
+  
+  // Fetch treks when component mounts
+  useEffect(() => {
+    if (visible) {
+      fetchTreks();
+    }
+  }, [visible, fetchTreks]);
 
   const pickMedia = async () => {
     setError('');
@@ -119,9 +131,10 @@ export function CreatePostModal({ visible, onClose, onPostSuccess }: CreatePostM
     setError('');
     setUploading(true);
     try {
-      await createPost(caption, media || '', 1); // Using trek ID 1 as default
+      await createPost(caption, media || '', selectedTrek?.id || null);
       setCaption('');
       setMedia(null);
+      setSelectedTrek(null);
       onPostSuccess();
     } catch (error: any) {
       console.log('Create post error:', error);
@@ -192,12 +205,87 @@ export function CreatePostModal({ visible, onClose, onPostSuccess }: CreatePostM
                 {uploading && <ActivityIndicator style={{ marginTop: 12 }} />}
               </View>
 
-              {/* Fixed Media Picker */}
+              {/* Trek Selector Modal */}
+              <Modal
+                visible={showTrekSelector}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowTrekSelector(false)}
+              >
+                <View style={[styles.trekSelectorOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                  <View style={[styles.trekSelectorModal, { backgroundColor: background as string }]}>
+                    <View style={styles.trekSelectorHeader}>
+                      <ThemedText style={styles.trekSelectorTitle}>Select Trek</ThemedText>
+                      <TouchableOpacity onPress={() => setShowTrekSelector(false)}>
+                        <IconSymbol name="xmark.circle.fill" size={24} color={themeColor as string} />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={[
+                        styles.trekItem,
+                        selectedTrek === null && { backgroundColor: themeColor + '20' }
+                      ]}
+                      onPress={() => {
+                        setSelectedTrek(null);
+                        setShowTrekSelector(false);
+                      }}
+                    >
+                      <ThemedText>None (General Post)</ThemedText>
+                      {selectedTrek === null && (
+                        <IconSymbol name="checkmark" size={18} color={themeColor as string} />
+                      )}
+                    </TouchableOpacity>
+                    
+                    <FlatList
+                      data={treks}
+                      keyExtractor={(item) => item.id.toString()}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity
+                          style={[
+                            styles.trekItem,
+                            selectedTrek?.id === item.id && { backgroundColor: themeColor + '20' }
+                          ]}
+                          onPress={() => {
+                            setSelectedTrek({ id: item.id, name: item.name });
+                            setShowTrekSelector(false);
+                          }}
+                        >
+                          <ThemedText>{item.name}</ThemedText>
+                          {selectedTrek?.id === item.id && (
+                            <IconSymbol name="checkmark" size={18} color={themeColor as string} />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                      style={styles.trekList}
+                    />
+                  </View>
+                </View>
+              </Modal>
+              
+              {/* Fixed Media & Trek Picker */}
               <View style={[styles.mediaRow, { backgroundColor: cardBackground as string }]}>
                 <TouchableOpacity onPress={pickMedia} style={styles.mediaButton}>
                   <IconSymbol name="photo" size={24} color={themeColor as string} />
                 </TouchableOpacity>
-                {/* Add more icons for video, camera, etc. if needed */}
+                
+                <TouchableOpacity 
+                  onPress={() => setShowTrekSelector(true)} 
+                  style={[styles.mediaButton, selectedTrek && styles.selectedMediaButton]}
+                >
+                  <IconSymbol 
+                    name="tag" 
+                    size={24} 
+                    color={selectedTrek ? '#007AFF' : themeColor as string} 
+                  />
+                  {selectedTrek && (
+                    <View style={styles.trekBadge}>
+                      <ThemedText style={styles.trekBadgeText} numberOfLines={1}>
+                        {selectedTrek.name}
+                      </ThemedText>
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -295,9 +383,70 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#F0F0F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedMediaButton: {
+    backgroundColor: '#e6f2ff',
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
   error: {
     color: 'red',
     marginTop: 8,
+  },
+  // Trek selector styles
+  trekSelectorOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  trekSelectorModal: {
+    width: '100%',
+    maxHeight: '80%',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  trekSelectorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+    marginBottom: 8,
+  },
+  trekSelectorTitle: {
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  trekList: {
+    maxHeight: 300,
+  },
+  trekItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  trekBadge: {
+    backgroundColor: '#007AFF30',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+    maxWidth: 120,
+  },
+  trekBadgeText: {
+    fontSize: 12,
+    color: '#007AFF',
   },
 });
