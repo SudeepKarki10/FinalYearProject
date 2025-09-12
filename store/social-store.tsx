@@ -8,6 +8,7 @@ interface SocialStore {
   posts: Post[];
   isLoading: boolean;
   userPost: string;
+  replyingTo: Comment | null;
   fetchPosts: () => Promise<void>;
   setUserPost: (text: string) => void;
   createPost: (caption: string, image?: string, trekId?: number | null) => Promise<void>;
@@ -15,12 +16,15 @@ interface SocialStore {
   deletePost: (postId: number) => Promise<void>;
   addComment: (postId: number, content: string, parentCommentId?: number | null) => Promise<void>;
   fetchComments: (postId: number) => Promise<Comment[]>;
+  likeComment: (commentId: number) => Promise<void>;
+  setReplyingTo: (comment: Comment | null) => void;
 }
 
 export const useSocialStore = create<SocialStore>((set, get) => ({
   posts: [],
   isLoading: false,
   userPost: '',
+  replyingTo: null,
 
   setUserPost: (text: string) => set({ userPost: text }),
 
@@ -315,6 +319,8 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
         },
         content: comment.content || '',
         createdAt: comment.created_at || new Date().toISOString(),
+        isLiked: comment.is_liked || false,
+        likesCount: comment.likes_count || 0,
         // Format replies if they exist
         replies: comment.replies?.map((reply: any) => ({
           id: reply.id,
@@ -325,7 +331,9 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
           },
           content: reply.content || '',
           createdAt: reply.created_at || new Date().toISOString(),
-          parent: reply.parent
+          parent: reply.parent,
+          isLiked: reply.is_liked || false,
+          likesCount: reply.likes_count || 0
         })) || []
       }));
       
@@ -336,4 +344,38 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
       return [];
     }
   },
+  
+  likeComment: async (commentId: number) => {
+    try {
+      const headers = getAuthHeaders();
+      if (!headers.Authorization) {
+        console.log('No authentication token found');
+        Alert.alert('Authentication Error', 'Please log in again');
+        return;
+      }
+      
+      console.log(`Toggling like for comment ${commentId}`);
+      
+      const response = await fetch(`${API_BASE_URL}comments/${commentId}/like/`, {
+        method: 'POST',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Like comment response:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('Error liking comment:', error);
+      throw error;
+    }
+  },
+  
+  setReplyingTo: (comment: Comment | null) => {
+    set({ replyingTo: comment });
+  }
 }));

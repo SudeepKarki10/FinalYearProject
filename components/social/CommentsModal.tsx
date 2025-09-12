@@ -1,5 +1,17 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Keyboard, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import { Modalize } from 'react-native-modalize';
 import { Portal } from 'react-native-portalize';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,15 +35,21 @@ const CommentsModal = forwardRef<CommentsModalRef, CommentsModalProps>(({ onClos
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
-  // We don't need post state since we're only displaying comments
   
   const textColor = useSafeThemeColor({}, 'text');
   const primaryColor = useSafeThemeColor({}, 'primary');
+  const secondaryColor = useSafeThemeColor({}, 'secondary');
   const modalizeRef = React.useRef<Modalize>(null);
   const inputRef = React.useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
   
-  const { addComment, fetchComments } = useSocialStore();
+  const { 
+    addComment, 
+    fetchComments, 
+    likeComment, 
+    replyingTo, 
+    setReplyingTo 
+  } = useSocialStore();
   
   const fetchCommentsData = useCallback(async (id: number) => {
     if (!id) return;
@@ -72,11 +90,24 @@ const CommentsModal = forwardRef<CommentsModalRef, CommentsModalProps>(({ onClos
 
     try {
       setLoading(true);
-      console.log(`Attempting to add comment to post ${postId}`);
-      const result = await addComment(postId, newComment);
+      
+      let parentId = null;
+      if (replyingTo) {
+        parentId = replyingTo.id;
+        console.log(`Replying to comment ${parentId}`);
+      }
+      
+      console.log(`Attempting to add ${parentId ? 'reply' : 'comment'} to post ${postId}`);
+      const result = await addComment(postId, newComment, parentId);
       console.log('Comment add result:', result);
+      
       setNewComment('');
       Keyboard.dismiss();
+      
+      // Clear reply state if it was a reply
+      if (replyingTo) {
+        setReplyingTo(null);
+      }
       
       // Refresh comments after adding a new one
       fetchCommentsData(postId);
@@ -91,7 +122,7 @@ const CommentsModal = forwardRef<CommentsModalRef, CommentsModalProps>(({ onClos
         [{ text: 'OK' }]
       );
     }
-  }, [postId, newComment, addComment, fetchCommentsData]);
+  }, [postId, newComment, addComment, fetchCommentsData, replyingTo, setReplyingTo]);
 
   useImperativeHandle(ref, () => ({
     open: handleOpen,
@@ -104,7 +135,32 @@ const CommentsModal = forwardRef<CommentsModalRef, CommentsModalProps>(({ onClos
     }
   }, [postId, fetchCommentsData]);
 
+  const handleLikeComment = useCallback(async (commentId: number) => {
+    try {
+      await likeComment(commentId);
+      
+      // After liking, refresh the comments to get updated state
+      if (postId) {
+        fetchCommentsData(postId);
+      }
+    } catch (error) {
+      console.error('Error liking comment:', error);
+    }
+  }, [likeComment, fetchCommentsData, postId]);
+  
+  const handleReplyToComment = useCallback((comment: Comment) => {
+    setReplyingTo(comment);
+    inputRef.current?.focus();
+  }, [setReplyingTo]);
+  
+  const cancelReply = useCallback(() => {
+    setReplyingTo(null);
+  }, [setReplyingTo]);
+
   const renderComment = (comment: Comment, isReply = false) => {
+    const hasLikes = (comment.likesCount && comment.likesCount > 0) || false;
+    const hasReplies = comment.replies && comment.replies.length > 0;
+    
     return (
       <View key={comment.id} style={[styles.comment, isReply && styles.replyContainer]}>
         <View style={styles.commentHeader}>
@@ -120,12 +176,41 @@ const CommentsModal = forwardRef<CommentsModalRef, CommentsModalProps>(({ onClos
               </ThemedText>
             </View>
             <ThemedText>{comment.content}</ThemedText>
+            
+            <View style={styles.commentActions}>
+              <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={() => handleLikeComment(comment.id)}
+              >
+                <IconSymbol 
+                  name={comment.isLiked ? "heart.fill" : "heart"} 
+                  size={14} 
+                  color={comment.isLiked ? "#ff3b30" : textColor} 
+                />
+                <ThemedText style={[
+                  styles.likesCount, 
+                  !hasLikes && styles.hiddenCount
+                ]}>
+                  {comment.likesCount || 0}
+                </ThemedText>
+              </TouchableOpacity>
+              
+              {!isReply && (
+                <TouchableOpacity 
+                  style={styles.actionButton} 
+                  onPress={() => handleReplyToComment(comment)}
+                >
+                  <IconSymbol name="arrowshape.turn.up.left" size={14} color={textColor} />
+                  <ThemedText style={styles.replyText}>Reply</ThemedText>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
         
-        {comment.replies && comment.replies.length > 0 && (
+        {hasReplies && (
           <View style={styles.repliesContainer}>
-            {comment.replies.map(reply => renderComment(reply, true))}
+            {comment.replies!.map(reply => renderComment(reply, true))}
           </View>
         )}
       </View>
@@ -159,11 +244,24 @@ const CommentsModal = forwardRef<CommentsModalRef, CommentsModalProps>(({ onClos
               keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
               style={styles.footer}
             >
+              {replyingTo && (
+                <View style={styles.replyingToContainer}>
+                  <View style={styles.replyingToContent}>
+                    <ThemedText style={styles.replyingToText}>
+                      Replying to <ThemedText style={styles.replyUsername}>{replyingTo.user.displayName}</ThemedText>
+                    </ThemedText>
+                  </View>
+                  <TouchableOpacity onPress={cancelReply} style={styles.cancelReplyButton}>
+                    <IconSymbol name="xmark" size={16} color={textColor} />
+                  </TouchableOpacity>
+                </View>
+              )}
+              
               <View style={styles.commentInputContainer}>
                 <TextInput 
                   ref={inputRef}
                   style={[styles.commentInput, { color: textColor }]}
-                  placeholder="Add a comment..."
+                  placeholder={replyingTo ? "Add your reply..." : "Add a comment..."}
                   placeholderTextColor="#999"
                   value={newComment}
                   onChangeText={setNewComment}
@@ -281,6 +379,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.5,
   },
+  commentActions: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  likesCount: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  hiddenCount: {
+    opacity: 0,
+  },
+  replyText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
   repliesContainer: {
     marginLeft: 46,
     marginTop: 8,
@@ -294,6 +412,26 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#eee',
     padding: 12,
+  },
+  replyingToContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    padding: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  replyingToContent: {
+    flex: 1,
+  },
+  replyingToText: {
+    fontSize: 12,
+  },
+  replyUsername: {
+    fontWeight: '600',
+  },
+  cancelReplyButton: {
+    padding: 4,
   },
   commentInputContainer: {
     flexDirection: 'row',
