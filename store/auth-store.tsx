@@ -70,7 +70,8 @@ export const useAuthStore = create<AuthState>()(
   const ct = response.headers.get('content-type') || '';
   const rawText = await response.text();
   const data = ct.includes('application/json') ? JSON.parse(rawText) : { raw: rawText } as any;
-  console.log('Login response:', data);
+  // Don't log response data to avoid showing sensitive info in console
+  // console.log('Login response:', data);
 
     if (!response.ok) {
       throw new Error(data.message || data.error || 'Login failed');
@@ -107,7 +108,8 @@ export const useAuthStore = create<AuthState>()(
     });
 
   } catch (error:any) {
-    console.error('Login error:', error);
+    // Don't log to console to avoid showing errors on UI
+    // console.error('Login error:', error);
     set({
       isLoading: false,
       error: error.message || "Failed to login. Please check your credentials.",
@@ -167,7 +169,8 @@ export const useAuthStore = create<AuthState>()(
           });
 
         } catch (error:any) {
-          console.error('Registration error:', error);
+          // Don't log to console to avoid showing errors on UI
+          // console.error('Registration error:', error);
           set({
             isLoading: false,
             error: error.message || "Failed to register. Please try again.",
@@ -292,7 +295,8 @@ export const useAuthStore = create<AuthState>()(
           });
 
         } catch (error:any) {
-          console.error('Logout error:', error);
+          // Don't log to console to avoid showing errors on UI
+          // console.error('Logout error:', error);
           set({
             isLoading: false,
             error: error.message || "Failed to logout. Please try again.",
@@ -399,6 +403,8 @@ export const useAuthStore = create<AuthState>()(
             photo_url: user.photo_url
           };
 
+          console.log('Sending update request with data:', data);
+
           const response = await fetch(`${API_BASE_URL}users/${user.id}/`, {
             method: 'PATCH',
             headers: {
@@ -408,20 +414,29 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify(data),
           });
 
-          console.log(response.body);
+          console.log('Response status:', response.status);
+          console.log('Response OK:', response.ok);
 
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to update interests');
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
+            let errorData;
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { message: errorText };
+            }
+            throw new Error(errorData.message || `Server error: ${response.status}`);
           }
 
           const updatedUser = await response.json();
+          console.log('User updated successfully:', updatedUser);
           
           // Safely update the user object with interests from either location
           set({ 
             user: { 
               ...user, 
-              interests: updatedUser?.interests || updatedUser?.profile?.interests || []
+              interests: updatedUser?.interests || updatedUser?.profile?.interests || safeInterests
             },
             hasCompletedOnboarding: true 
           });
@@ -431,7 +446,7 @@ export const useAuthStore = create<AuthState>()(
           console.error('Error updating interests:', error);
           // Still mark onboarding as complete to prevent UI getting stuck
           set({ hasCompletedOnboarding: true });
-          return false;
+          throw error; // Re-throw to let the onboarding form handle it properly
         }
       },
       

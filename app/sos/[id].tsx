@@ -31,6 +31,48 @@ function QuickCallButton({ phone, name, type }: { phone: string; name: string; t
   );
 }
 
+function ContactServiceCard({ service }: { service: any }) {
+  const handleEmail = () => {
+    if (service.email) {
+      Linking.openURL(`mailto:${service.email}`);
+    }
+  };
+
+  const handleCall = () => {
+    if (service.phone) {
+      const phoneNumber = service.phone.replace(/\s+/g, '');
+      Linking.openURL(`tel:${phoneNumber}`);
+    }
+  };
+
+  return (
+    <View style={styles.contactCard}>
+      <View style={styles.contactHeader}>
+        <Ionicons name="person-outline" size={20} color={colors.primary} />
+        <View style={styles.contactInfo}>
+          <Text style={styles.contactName}>{service.name}</Text>
+          <Text style={styles.contactType}>{service.type} • {service.source || 'default'}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.contactActions}>
+        {service.email && (
+          <TouchableOpacity style={styles.contactActionButton} onPress={handleEmail}>
+            <Ionicons name="mail-outline" size={20} color={colors.primary} />
+            <Text style={styles.contactActionText}>{service.email}</Text>
+          </TouchableOpacity>
+        )}
+        {service.phone && (
+          <TouchableOpacity style={styles.contactActionButton} onPress={handleCall}>
+            <Ionicons name="call-outline" size={20} color={colors.primary} />
+            <Text style={styles.contactActionText}>{service.phone}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
 interface PhoneContact {
   phone: string;
   name: string;
@@ -121,6 +163,27 @@ export default function AlertDetailsPage() {
     return numbers;
   };
 
+  const parseEmergencyTypes = (emergencyType: string | string[]): string[] => {
+    if (Array.isArray(emergencyType)) {
+      return emergencyType;
+    }
+    if (typeof emergencyType === 'string') {
+      // Handle string representation of array like "['rescue', 'injured']"
+      try {
+        if (emergencyType.startsWith('[') && emergencyType.endsWith(']')) {
+          const parsed = emergencyType.slice(1, -1).split(',').map(item => 
+            item.trim().replace(/['"]/g, '')
+          );
+          return parsed.filter(item => item.length > 0);
+        }
+        return [emergencyType];
+      } catch {
+        return [emergencyType];
+      }
+    }
+    return [];
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
@@ -155,28 +218,83 @@ export default function AlertDetailsPage() {
                         alert.status === 'sent' ? colors.warning + '20' : 
                         colors.error + '20'
       }]}>
-        <View style={styles.statusDot} />
-        <Text style={[styles.statusText, {
-          color: alert.status === 'resolved' ? colors.success : 
+        <Ionicons 
+          name={alert.status === 'resolved' ? 'checkmark-circle' : 
+                alert.status === 'sent' ? 'time' : 'alert-circle'} 
+          size={24} 
+          color={alert.status === 'resolved' ? colors.success : 
                  alert.status === 'sent' ? colors.warning : 
-                 colors.error
-        }]}>
-          {alert.status.toUpperCase()}
+                 colors.error} 
+        />
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text style={[styles.statusText, {
+            color: alert.status === 'resolved' ? colors.success : 
+                   alert.status === 'sent' ? colors.warning : 
+                   colors.error
+          }]}>
+            {alert.status.toUpperCase()}
+          </Text>
+          <Text style={styles.timeText}>
+            Created: {new Date(alert.created_at).toLocaleString()}
+          </Text>
+          {alert.resolved_at && (
+            <Text style={styles.timeText}>
+              Resolved: {new Date(alert.resolved_at).toLocaleString()}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Alert Information */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="information-circle-outline" size={20} color={colors.primary} /> Alert Information
         </Text>
-        <Text style={styles.timeText}>
-          {new Date(alert.created_at).toLocaleString()}
-        </Text>
+        <View style={styles.alertInfoCard}>
+          <View style={styles.alertInfoRow}>
+            <Text style={styles.alertInfoLabel}>Alert ID</Text>
+            <Text style={styles.alertInfoValue}>#{alert.id}</Text>
+          </View>
+          <View style={styles.alertInfoRow}>
+            <Text style={styles.alertInfoLabel}>Status</Text>
+            <Text style={[styles.alertInfoValue, {
+              color: alert.status === 'resolved' ? colors.success : 
+                     alert.status === 'sent' ? colors.warning : 
+                     colors.error
+            }]}>
+              {alert.status.charAt(0).toUpperCase() + alert.status.slice(1)}
+            </Text>
+          </View>
+          <View style={[styles.alertInfoRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.alertInfoLabel}>Created</Text>
+            <Text style={styles.alertInfoValue}>
+              {new Date(alert.created_at).toLocaleDateString()} at {new Date(alert.created_at).toLocaleTimeString()}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Description */}
       {Boolean(alert.description) && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            <Ionicons name="document-text-outline" size={20} color={colors.primary} /> Description
+            <Ionicons name="document-text-outline" size={20} color={colors.primary} /> Emergency Description
           </Text>
           <View style={styles.descriptionCard}>
             <Text style={styles.descriptionText}>{alert.description}</Text>
           </View>
+        </View>
+      )}
+
+      {/* Contacted Services */}
+      {alert.contacted_services && alert.contacted_services.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            <Ionicons name="people-outline" size={20} color={colors.primary} /> Emergency Contacts
+          </Text>
+          {alert.contacted_services.map((service, index) => (
+            <ContactServiceCard key={`service-${index}`} service={service} />
+          ))}
         </View>
       )}
 
@@ -206,12 +324,22 @@ export default function AlertDetailsPage() {
         </Text>
         <View style={styles.chipContainer}>
           {alert.emergency_type && (
-            <View style={[styles.chip, { backgroundColor: colors.error + '20' }]}>
-              <Text style={[styles.chipText, { color: colors.error }]}>Primary: {alert.emergency_type}</Text>
-            </View>
+            <>
+              <Text style={[styles.sectionTitle, { fontSize: 14, marginBottom: 8, color: colors.error }]}>
+                Primary Emergency:
+              </Text>
+              {parseEmergencyTypes(alert.emergency_type).map((type, index) => (
+                <View key={`primary-${index}`} style={[styles.chip, { backgroundColor: colors.error + '20' }]}>
+                  <Text style={[styles.chipText, { color: colors.error }]}>{type}</Text>
+                </View>
+              ))}
+              <Text style={[styles.sectionTitle, { fontSize: 14, marginBottom: 8, marginTop: 12, color: colors.textSecondary }]}>
+                Selected Services:
+              </Text>
+            </>
           )}
-          {alert.selected_types.map((type, index) => (
-            <View key={index} style={styles.chip}>
+          {alert.selected_types && alert.selected_types.map((type, index) => (
+            <View key={`selected-${index}`} style={styles.chip}>
               <Text style={styles.chipText}>{type}</Text>
             </View>
           ))}
@@ -221,28 +349,53 @@ export default function AlertDetailsPage() {
       {/* Location */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
-          <Ionicons name="location-outline" size={20} color={colors.primary} /> Location
+          <Ionicons name="location-outline" size={20} color={colors.primary} /> Emergency Location
         </Text>
-        <View style={styles.locationCard}>
-          <Text style={styles.locationText}>
-            {alert.latitude.toFixed(6)}, {alert.longitude.toFixed(6)}
-          </Text>
-          <TouchableOpacity
+        
+        {/* Map View */}
+        <View style={styles.mapContainer}>
+          <TouchableOpacity 
+            style={styles.mapPlaceholder}
             onPress={() => Linking.openURL(`https://maps.google.com/?q=${alert.latitude},${alert.longitude}`)}
-            style={{ marginTop: 8 }}
           >
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>Open in Maps</Text>
+            <Ionicons name="map-outline" size={48} color={colors.primary} />
+            <Text style={styles.mapPlaceholderText}>Tap to view on Google Maps</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.locationCard}>
+          <View style={styles.alertInfoRow}>
+            <Text style={styles.alertInfoLabel}>Latitude</Text>
+            <Text style={styles.alertInfoValue}>{alert.latitude.toFixed(6)}</Text>
+          </View>
+          <View style={[styles.alertInfoRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.alertInfoLabel}>Longitude</Text>
+            <Text style={styles.alertInfoValue}>{alert.longitude.toFixed(6)}</Text>
+          </View>
+          
+         
         </View>
       </View>
 
-      {/* Nearby Places */}
-      {alert.google_places_data && alert.google_places_data.length > 0 && (
+      {/* Fallback Contacts */}
+      {alert.fallback_contacts && alert.fallback_contacts.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            <Ionicons name="business-outline" size={20} color={colors.primary} /> Nearby Places
+            <Ionicons name="call-outline" size={20} color={colors.primary} /> Fallback Contacts
           </Text>
-          {alert.google_places_data.map((place, index) => (
+          {alert.fallback_contacts.map((contact, index) => (
+            <ContactServiceCard key={`fallback-${index}`} service={contact} />
+          ))}
+        </View>
+      )}
+
+      {/* Nearby Places */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          <Ionicons name="business-outline" size={20} color={colors.primary} /> Nearby Emergency Services
+        </Text>
+        {alert.google_places_data && alert.google_places_data.length > 0 ? (
+          alert.google_places_data.map((place, index) => (
             <View key={index} style={styles.placeCard}>
               <View style={styles.placeHeader}>
                 <Text style={styles.placeName}>{place.name}</Text>
@@ -258,10 +411,25 @@ export default function AlertDetailsPage() {
                 <Text style={styles.distanceText}>{place.distance_km.toFixed(2)} km away</Text>
                 <Text style={styles.typeTag}>{place.type}</Text>
               </View>
+              {place.phone && (
+                <TouchableOpacity
+                  style={[styles.contactActionButton, { marginTop: 8 }]}
+                  onPress={() => Linking.openURL(`tel:${place.phone}`)}
+                >
+                  <Ionicons name="call" size={16} color={colors.primary} />
+                  <Text style={styles.contactActionText}>{place.phone}</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          ))}
-        </View>
-      )}
+          ))
+        ) : (
+          <View style={styles.alertInfoCard}>
+            <Text style={[styles.alertInfoValue, { textAlign: 'center', color: colors.textSecondary }]}>
+              No nearby emergency services found for this location
+            </Text>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -280,17 +448,12 @@ const styles = StyleSheet.create({
   },
   statusBanner: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
+    alignItems: 'flex-start',
+    padding: 16,
     borderRadius: 12,
     marginBottom: 16,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'currentColor',
-    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   statusText: {
     fontSize: 16,
@@ -444,5 +607,94 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     lineHeight: 20,
+  },
+  contactCard: {
+    backgroundColor: colors.card,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  contactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  contactInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  contactType: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  contactActions: {
+    gap: 8,
+  },
+  contactActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    backgroundColor: colors.primary + '10',
+    borderRadius: 8,
+    gap: 8,
+  },
+  contactActionText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  alertInfoCard: {
+    backgroundColor: colors.card,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  alertInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  alertInfoLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  alertInfoValue: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.card,
+  },
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.primary + '10',
+  },
+  mapPlaceholderText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
   },
 });

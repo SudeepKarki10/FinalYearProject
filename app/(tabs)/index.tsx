@@ -1,11 +1,9 @@
+import { ThemedView } from "@/components/ThemedView";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, ScrollView, StyleSheet, View } from "react-native";
-import { CategoryCard } from "../../components/CategoryCard";
 import OnboardingForm from "../../components/OnboardingForm";
 import { RecommendedTreks } from "../../components/RecommendedTreks";
-import { SearchBar } from "../../components/SearchBar";
 import { ThemedText } from "../../components/ThemedText";
-import { ThemedView } from "../../components/ThemedView";
 import { TrekCard } from "../../components/TrekCard";
 import { useAuthStore } from "../../store/auth-store";
 import { useTrekStore } from "../../store/trek-store";
@@ -43,22 +41,22 @@ export default function MainPage() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.searchBar}>
+        {/* <View style={styles.searchBar}>
           <SearchBar
             value={searchQuery}
             onChangeText={setSearchQuery}
             onClear={() => setSearchQuery("")}
           />
-        </View>
+        </View> */}
         
         {/* Categories Section */}
-        <FlatList
+        {/* <FlatList
           horizontal
           data={categories}
           renderItem={({ item }) => <CategoryCard category={item} />}
           showsHorizontalScrollIndicator={false}
           style={styles.categoriesList}
-        />
+        /> */}
 
         {/* Recommended Treks Section (shows if any exist) */}
         {isAuthenticated && recommendedTreks?.length > 0 && (
@@ -85,6 +83,7 @@ export default function MainPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    marginTop: 40,
   },
   scrollView: {
     flex: 1,

@@ -95,6 +95,15 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
 
   createPost: async (caption: string, image?: string, trekId?: number | null) => {
     try {
+      console.log('=== CREATE POST DEBUG ===');
+      console.log('Input parameters:');
+      console.log('- Caption:', caption);
+      console.log('- Image:', image);
+      console.log('- Trek ID:', trekId);
+      console.log('- Trek ID type:', typeof trekId);
+      console.log('- Trek ID is null:', trekId === null);
+      console.log('- Trek ID is undefined:', trekId === undefined);
+      
       set({ isLoading: true });
       
       const headers = getAuthHeaders();
@@ -114,23 +123,46 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
         images: image ? [image] : []
       };
       
-      console.log('Sending post data:', postData);
+      console.log('=== POST DATA PAYLOAD ===');
+      console.log('Sending post data:', JSON.stringify(postData, null, 2));
+      console.log('Trek field value:', postData.trek);
+      console.log('Trek field type:', typeof postData.trek);
       
-      const response = await fetch(`${API_BASE_URL}posts/`, {
+      const requestUrl = `${API_BASE_URL}posts/`;
+      console.log('Request URL:', requestUrl);
+      console.log('Request headers:', headers);
+      
+      const response = await fetch(requestUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify(postData),
       });
 
+      console.log('=== RESPONSE DEBUG ===');
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
       const data = await response.json();
+      console.log('Response data:', JSON.stringify(data, null, 2));
       
       if (data.success) {
+        console.log('Post created successfully!');
         set({ userPost: '' }); // Clear the input
         get().fetchPosts(); // Refresh posts
       } else {
+        console.log('Post creation failed:', data.error);
+        console.log('Full error response:', data);
         Alert.alert('Error', data.error || 'Failed to create post');
       }
     } catch (error) {
+      console.log('=== CATCH BLOCK ERROR ===');
+      console.log('Error type:', typeof error);
+      console.log('Error instanceof Error:', error instanceof Error);
+      console.log('Error message:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.log('Full error object:', error);
+      
       const errorMessage = error instanceof Error ? error.message : 'Failed to create post';
       Alert.alert('Error', errorMessage);
       console.error(error);
