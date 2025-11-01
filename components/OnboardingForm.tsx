@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/Colors';
@@ -89,52 +89,42 @@ export default function OnboardingForm() {
       // Only update interests if user has selected some
       if (selectedInterests.length > 0) {
         console.log('Updating user interests:', selectedInterests);
-        const updateResult = await updateUserInterests(selectedInterests);
-        console.log('User interests update result:', updateResult);
         
-        // Proceed with recommendations if we got any kind of successful response
-        if (updateResult) {
-          console.log('User interests updated successfully, fetching recommendations...');
-          try {
-            // Wait a bit longer to ensure backend has processed the interest update
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            await fetchRecommendedTreks();
-            console.log('Recommendations fetched successfully');
-            recommendationsFetched = true;
-          } catch (recError) {
-            console.error('Failed to fetch recommendations:', recError);
-            // Log more details about the error
-            if (recError instanceof Error) {
-              console.error('Error details:', {
-                message: recError.message,
-                name: recError.name,
-                stack: recError.stack
-              });
+        try {
+          const updateResult = await updateUserInterests(selectedInterests);
+          console.log('User interests update result:', updateResult);
+          
+          if (updateResult) {
+            console.log('User interests updated successfully, fetching recommendations...');
+            try {
+              // Wait a bit to ensure backend has processed the interest update
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await fetchRecommendedTreks();
+              console.log('Recommendations fetched successfully');
+              recommendationsFetched = true;
+            } catch (recError) {
+              console.error('Failed to fetch recommendations:', recError);
+              // Continue with navigation even if recommendations fail
             }
+          } else {
+            console.warn('Interest update returned false, but continuing...');
           }
-        } else {
-          console.warn('Interest update may not have succeeded:', updateResult);
+        } catch (updateError) {
+          console.error('Error updating interests:', updateError);
+          // Continue with navigation even if update fails
+          console.log('Continuing despite interest update failure...');
         }
       } else {
-        console.log('Skipping without interests...');
-        // Mark onboarding complete locally when no interests are chosen
+        console.log('No interests selected, marking onboarding complete...');
         completeOnboardingLocally();
       }
     } catch (error) {
       console.error('Failed in onboarding process:', error);
-      // Log more details about the error
-      if (error instanceof Error) {
-        console.error('Error details:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
-        });
-      }
       // Ensure onboarding is marked complete locally so UI can proceed
       completeOnboardingLocally();
     }
     
-    // Only navigate after ensuring recommendations are fetched or there was an error
+    // Always navigate after processing
     try {
       // If we successfully fetched recommendations, wait a moment to ensure they're processed
       if (recommendationsFetched) {
@@ -144,13 +134,6 @@ export default function OnboardingForm() {
       replace('/(tabs)');
     } catch (navError) {
       console.error('Navigation error:', navError);
-      if (navError instanceof Error) {
-        console.error('Navigation error details:', {
-          message: navError.message,
-          name: navError.name,
-          stack: navError.stack
-        });
-      }
     } finally {
       setIsNavigating(false);
     }

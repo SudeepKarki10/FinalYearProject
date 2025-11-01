@@ -92,7 +92,7 @@ export default function CreatePostScreen() {
         imageUrl = await uploadToCloudinary(image);
       }
       
-      await createPost(caption, imageUrl, 1); // Using trek ID 1 as default
+      await createPost(caption, imageUrl);
       router.back();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to create post';

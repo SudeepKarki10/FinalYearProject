@@ -128,16 +128,32 @@ export function CreatePostModal({ visible, onClose, onPostSuccess }: CreatePostM
   };
 
   const handlePost = async () => {
+    console.log('=== HANDLE POST DEBUG ===');
+    console.log('Caption:', caption);
+    console.log('Media:', media);
+    console.log('Selected Trek:', selectedTrek);
+    console.log('Selected Trek ID:', selectedTrek?.id);
+    console.log('Trek ID to send:', selectedTrek?.id || null);
+    
+    // Check if we have a trek selected
+    if (!selectedTrek?.id) {
+      console.log('=== NO TREK SELECTED ===');
+      console.log('This will likely cause a backend error because trek field is required');
+      setError('Please select a trek or location for your post. You can choose "None (General Post)" if this is a general discussion.');
+      return;
+    }
+    
     setError('');
     setUploading(true);
     try {
-      await createPost(caption, media || '', selectedTrek?.id || null);
+      await createPost(caption, media || '', selectedTrek?.id);
       setCaption('');
       setMedia(null);
       setSelectedTrek(null);
       onPostSuccess();
     } catch (error: any) {
       console.log('Create post error:', error);
+      console.log('Error details:', JSON.stringify(error, null, 2));
       setError('Failed to create post. Please try again.');
     } finally {
       setUploading(false);
@@ -159,8 +175,21 @@ export function CreatePostModal({ visible, onClose, onPostSuccess }: CreatePostM
                   <IconSymbol name="chevron.right" size={28} color={themeColor as string} style={{ transform: [{ rotate: '180deg' }] }} />
                 </TouchableOpacity>
                 <ThemedText style={styles.title}>Post</ThemedText>
-                <TouchableOpacity onPress={handlePost} disabled={uploading || (!caption && !media)}>
-                  <ThemedText style={[styles.publish, { opacity: uploading || (!caption && !media) ? 0.5 : 1 }]}>Post</ThemedText>
+                <TouchableOpacity 
+                  onPress={() => {
+                    console.log('=== POST BUTTON CLICKED ===');
+                    console.log('Button disabled?', uploading || (!caption && !media));
+                    console.log('Uploading?', uploading);
+                    console.log('Caption empty?', !caption);
+                    console.log('Media empty?', !media);
+                    console.log('About to call handlePost...');
+                    handlePost();
+                  }} 
+                  disabled={uploading || (!caption && !media)}
+                >
+                  <ThemedText style={[styles.publish, { opacity: uploading || (!caption && !media) ? 0.5 : 1 }]}>
+                    {uploading ? 'Posting...' : 'Post'}
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
 
@@ -227,7 +256,9 @@ export function CreatePostModal({ visible, onClose, onPostSuccess }: CreatePostM
                         selectedTrek === null && { backgroundColor: themeColor + '20' }
                       ]}
                       onPress={() => {
+                        console.log('=== TREK SELECTOR: None selected ===');
                         setSelectedTrek(null);
+                        console.log('Selected trek set to null');
                         setShowTrekSelector(false);
                       }}
                     >
@@ -247,7 +278,11 @@ export function CreatePostModal({ visible, onClose, onPostSuccess }: CreatePostM
                             selectedTrek?.id === item.id && { backgroundColor: themeColor + '20' }
                           ]}
                           onPress={() => {
+                            console.log('=== TREK SELECTOR: Trek selected ===');
+                            console.log('Selected trek ID:', item.id);
+                            console.log('Selected trek name:', item.name);
                             setSelectedTrek({ id: item.id, name: item.name });
+                            console.log('Selected trek state updated');
                             setShowTrekSelector(false);
                           }}
                         >
