@@ -33,7 +33,7 @@ export default function QRScannerModal({ visible, onClose, verificationResult }:
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  const { verifyQRCode, updatePassStatus, isLoading } = useAdminStore();
+  const { verifyQRCode, updatePassStatus, clearVerificationResult, isLoading } = useAdminStore();
 
   useEffect(() => {
     if (visible && !permission) {
@@ -65,8 +65,10 @@ export default function QRScannerModal({ visible, onClose, verificationResult }:
   };
 
   const resetScanner = () => {
+    console.log('QRScannerModal: Resetting scanner');
     setScanned(false);
     setScanning(false);
+    clearVerificationResult();
   };
 
   const handleSaveStatus = async () => {
@@ -126,9 +128,13 @@ export default function QRScannerModal({ visible, onClose, verificationResult }:
       fontSize: 18,
       fontWeight: '600',
       color: '#ffffff',
+      flex: 1,
+      textAlign: 'center',
     },
     closeButton: {
       padding: 8,
+      width: 40,
+      alignItems: 'center',
     },
     scannerContainer: {
       flex: 1,
@@ -624,6 +630,9 @@ export default function QRScannerModal({ visible, onClose, verificationResult }:
     <Modal visible={visible} animationType="slide" style={styles.modal}>
       <View style={styles.container}>
         <View style={styles.header}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Scan TIMS QR Code</Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Ionicons name="close" size={24} color="#ffffff" />

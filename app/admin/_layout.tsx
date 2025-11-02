@@ -19,12 +19,12 @@ export default function AdminLayout() {
   }
 
   return (
-    <Stack>
+    <Stack >
       <Stack.Screen 
         name="index" 
         options={{ 
           title: 'Admin Dashboard',
-          headerShown: true,
+          headerShown: false,
         }} 
       />
     </Stack>

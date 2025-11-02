@@ -3,6 +3,19 @@ import { API_BASE_URL } from '../constants/config';
 import { TimsPass } from '../types/tims';
 import { useAuthStore } from './auth-store';
 
+const normalizePassStatus = (status: unknown): 'pending' | 'approved' | 'rejected' => {
+  if (typeof status !== 'string') {
+    return 'pending';
+  }
+
+  const lowered = status.toLowerCase();
+  if (lowered === 'approved' || lowered === 'rejected') {
+    return lowered as 'approved' | 'rejected';
+  }
+
+  return 'pending';
+};
+
 interface VerificationDetails {
   verified_by: string;
   officer_role: string;
@@ -76,41 +89,87 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
+      const targetStatus = normalizePassStatus(status);
       const response = await fetch(`${API_BASE_URL}tims/${passId}/`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Token ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status: targetStatus }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to update pass status');
       }
 
-      // Update the pass in the local state
-      set((state) => ({
-        adminPasses: state.adminPasses.map((pass) =>
-          pass.id === passId ? { ...pass, status } : pass
-        ),
-        isLoading: false,
-      }));
+      let responseData: unknown = null;
+      try {
+        responseData = await response.json();
+      } catch {
+        responseData = null;
+      }
 
-      // Also update in verification result if present
+      const dataPayload = (() => {
+        if (!responseData || typeof responseData !== 'object') {
+          return null;
+        }
+
+        const payload = 'data' in (responseData as Record<string, unknown>)
+          ? (responseData as Record<string, unknown>).data
+          : responseData;
+
+        return payload && typeof payload === 'object' ? payload : null;
+      })();
+
+      const normalizedPayload: Partial<TimsPass> | null = (() => {
+        if (!dataPayload) {
+          return null;
+        }
+
+        const recordPayload = dataPayload as Record<string, unknown>;
+        const draft: Partial<TimsPass> = { ...(recordPayload as Partial<TimsPass>) };
+
+        if ('status' in recordPayload) {
+          draft.status = normalizePassStatus(recordPayload.status);
+        }
+
+        return draft;
+      })();
+
+      const updatedStatus = normalizedPayload?.status ?? targetStatus;
+
       set((state) => {
-        if (state.qrVerificationResult?.permit_details?.id === passId) {
-          return {
-            qrVerificationResult: {
-              ...state.qrVerificationResult,
-              permit_details: {
-                ...state.qrVerificationResult.permit_details,
-                status,
-              },
+        const updatedPasses = state.adminPasses.map((currentPass) =>
+          currentPass.id === passId
+            ? {
+                ...currentPass,
+                ...(normalizedPayload ?? {}),
+                status: updatedStatus,
+              }
+            : currentPass
+        );
+
+        let nextVerificationResult = state.qrVerificationResult;
+        if (
+          nextVerificationResult?.permit_details &&
+          nextVerificationResult.permit_details.id === passId
+        ) {
+          nextVerificationResult = {
+            ...nextVerificationResult,
+            permit_details: {
+              ...nextVerificationResult.permit_details,
+              ...(normalizedPayload ?? {}),
+              status: updatedStatus,
             },
           };
         }
-        return state;
+
+        return {
+          adminPasses: updatedPasses,
+          qrVerificationResult: nextVerificationResult,
+          isLoading: false,
+        };
       });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : 'Failed to update pass status', isLoading: false });
