@@ -1,40 +1,48 @@
 import { ThemedView } from "@/components/ThemedView";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect } from "react";
 import { FlatList, ScrollView, StyleSheet, View } from "react-native";
 import OnboardingForm from "../../components/OnboardingForm";
 import { RecommendedTreks } from "../../components/RecommendedTreks";
 import { ThemedText } from "../../components/ThemedText";
 import { TrekCard } from "../../components/TrekCard";
-import { useAuthStore } from "../../store/auth-store";
+import { isAdminRole, useAuthStore } from "../../store/auth-store";
 import { useTrekStore } from "../../store/trek-store";
 import { Trek } from "../../types";
-import { Category } from "../../types/trek";
 
 export default function MainPage() {
   const { fetchTreks, treks, fetchRecommendedTreks, recommendedTreks } = useTrekStore();
-  const { isAuthenticated, hasCompletedOnboarding } = useAuthStore();
-  const [searchQuery, setSearchQuery] = useState("");
-  const categories: Category[] = [
-    { id: 'hiking', name: 'Hiking', icon: 'Mountain', color: '#4F46E5' },
-    { id: 'camping', name: 'Camping', icon: 'Map', color: '#16A34A' },
-    { id: 'cycling', name: 'Cycling', icon: 'User', color: '#DC2626' },
-    { id: 'climbing', name: 'Climbing', icon: 'Camera', color: '#F59E0B' },
-  ];
+  const { isAuthenticated, hasCompletedOnboarding, user } = useAuthStore();
+  const router = useRouter();
   
   const renderTrekCard = useCallback(({ item }: { item: Trek }) => (
     <TrekCard trek={item} style={styles.trekCard} />
   ), []);
 
   useEffect(() => {
+    if (isAdminRole(user?.role)) {
+      router.replace('/admin');
+    }
+  }, [user?.role, router]);
+
+  useEffect(() => {
+    if (isAdminRole(user?.role)) {
+      return;
+    }
+
     fetchTreks();
     // Try to fetch recommendations when authenticated and onboarding is complete
     if (isAuthenticated && hasCompletedOnboarding) {
       console.log('Home: Fetching recommendations for authenticated user');
       fetchRecommendedTreks();
     }
-  }, [fetchTreks, fetchRecommendedTreks, isAuthenticated, hasCompletedOnboarding]);
+  }, [fetchTreks, fetchRecommendedTreks, isAuthenticated, hasCompletedOnboarding, user?.role]);
 
-  if (isAuthenticated && !hasCompletedOnboarding) {
+  if (isAdminRole(user?.role)) {
+    return null;
+  }
+
+  if (isAuthenticated && !isAdminRole(user?.role) && !hasCompletedOnboarding) {
     return <OnboardingForm />;
   }
 

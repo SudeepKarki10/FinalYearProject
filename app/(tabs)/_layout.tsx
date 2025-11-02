@@ -1,14 +1,23 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { colors } from '@/constants/Colors';
+import { isAdminRole, useAuthStore } from '@/store/auth-store';
 
 export default function TabLayout() {
   const theme =  colors.primary;
+  const router = useRouter();
+  const userRole = useAuthStore((state) => state.user?.role);
+
+  useEffect(() => {
+    if (isAdminRole(userRole)) {
+      router.replace('/admin');
+    }
+  }, [userRole, router]);
 
   const screenOptions: any = {
     tabBarActiveTintColor: theme,

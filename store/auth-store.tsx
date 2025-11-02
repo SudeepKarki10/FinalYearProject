@@ -12,6 +12,7 @@ interface User {
   display_name: string;
   photo_url?: string | null;
   interests?: UserInterests;
+  role?: string;
   user?: {
     id: number;
     username: string;
@@ -44,6 +45,60 @@ interface AuthState {
   // Mark onboarding complete locally without network calls
   completeOnboardingLocally: () => void;
 }
+
+
+const normalizeRole = (role: unknown): string => {
+  if (role === null || role === undefined) {
+    return 'user';
+  }
+
+  const text = String(role).trim();
+  if (text.length === 0) {
+    return 'user';
+  }
+
+  const lower = text.toLowerCase();
+
+  if (['admin', 'administrator', 'admin/officer', 'admin officer', 'officer'].includes(lower)) {
+    return 'admin';
+  }
+
+  if (['superadmin', 'super admin', 'super-admin'].includes(lower)) {
+    return 'superadmin';
+  }
+
+  if (['user', 'regular user', 'member'].includes(lower)) {
+    return 'user';
+  }
+
+  return lower;
+};
+
+export const isAdminRole = (role?: string | null): boolean => {
+  const normalized = normalizeRole(role);
+  return normalized === 'admin' || normalized === 'superadmin';
+};
+
+const extractRole = (candidate: any): string => {
+  if (!candidate) {
+    return 'user';
+  }
+
+  const potentialRoles = [
+    candidate.role,
+    candidate.profile?.role,
+    candidate.user?.role,
+    candidate.user?.profile?.role,
+  ];
+
+  for (const value of potentialRoles) {
+    if (value !== null && value !== undefined && String(value).trim().length > 0) {
+      return normalizeRole(value);
+    }
+  }
+
+  return 'user';
+};
 
 
 export const useAuthStore = create<AuthState>()(
@@ -81,12 +136,14 @@ export const useAuthStore = create<AuthState>()(
     const payload: any = (data && typeof data === 'object' && 'data' in data) ? (data as any).data : data;
     const { token, user: responseUser } = payload;
     const inner = responseUser?.user || responseUser; // support both nested and flat shapes
+    const role = extractRole(responseUser ?? inner);
     const user: User = {
       id: inner.id,
       username: inner.username,
       email: inner.email,
       display_name: responseUser.display_name ?? inner.display_name ?? inner.username,
       photo_url: responseUser.photo_url || null,
+      role,
       user: {
         id: inner.id,
         username: inner.username,
@@ -97,14 +154,14 @@ export const useAuthStore = create<AuthState>()(
 
     await AsyncStorage.setItem('auth_token', token);
 
-    // Always require onboarding after each successful login
+    // Admins can bypass onboarding, regular users see it after login
     set({
       user,
       token,
       isAuthenticated: true,
       isLoading: false,
       successMessage: "Login successful!",
-      hasCompletedOnboarding: false,
+      hasCompletedOnboarding: isAdminRole(role),
     });
 
   } catch (error:any) {
@@ -143,12 +200,14 @@ export const useAuthStore = create<AuthState>()(
           const payload: any = (data && typeof data === 'object' && 'data' in data) ? (data as any).data : data;
           const { token, user: responseUser } = payload;
           const inner = responseUser?.user || responseUser;
+          const role = extractRole(responseUser ?? inner);
           const user: User = {
             id: inner.id,
             username: inner.username,
             email: inner.email,
             display_name: responseUser.display_name ?? inner.display_name ?? inner.username,
             photo_url: responseUser.photo_url || null,
+            role,
             user: {
               id: inner.id,
               username: inner.username,
@@ -165,7 +224,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
             successMessage: "Registration successful!",
-            hasCompletedOnboarding: false,
+            hasCompletedOnboarding: isAdminRole(role),
           });
 
         } catch (error:any) {
@@ -292,6 +351,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
             successMessage: "Logged out successfully",
+            hasCompletedOnboarding: false,
           });
 
         } catch (error:any) {
@@ -357,6 +417,16 @@ export const useAuthStore = create<AuthState>()(
       initAuth: async () => {
         try {
           const token = await AsyncStorage.getItem('auth_token');
+          const existingUser = get().user;
+          const normalizedRole = extractRole(existingUser);
+
+          if (existingUser && normalizedRole !== existingUser.role) {
+            set({ user: { ...existingUser, role: normalizedRole } });
+          }
+
+          if (isAdminRole(normalizedRole)) {
+            set({ hasCompletedOnboarding: true });
+          }
           
           if (token) {
             set({ token });
