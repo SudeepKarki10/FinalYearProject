@@ -2,10 +2,11 @@ import { colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { TimsPass } from '@/types/tims';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
-  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,12 +15,31 @@ import {
 
 interface TimsPassCardProps {
   pass: TimsPass;
-  onStatusChange: (status: 'pending' | 'approved' | 'rejected') => void;
+  onStatusChange: (status: 'pending' | 'approved' | 'rejected') => Promise<void>;
 }
+
+const normalizeStatus = (status?: string | null): 'pending' | 'approved' | 'rejected' => {
+  switch ((status ?? '').toLowerCase()) {
+    case 'approved':
+      return 'approved';
+    case 'rejected':
+      return 'rejected';
+    default:
+      return 'pending';
+  }
+};
 
 export default function TimsPassCard({ pass, onStatusChange }: TimsPassCardProps) {
   const colorScheme = useColorScheme();
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<'pending' | 'approved' | 'rejected'>(
+    () => normalizeStatus(pass.status)
+  );
+
+  useEffect(() => {
+    setCurrentStatus(normalizeStatus(pass.status));
+  }, [pass.status]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -84,6 +104,9 @@ export default function TimsPassCard({ pass, onStatusChange }: TimsPassCardProps
       borderRadius: 20,
       borderWidth: 1,
     },
+    statusButtonDisabled: {
+      opacity: 0.6,
+    },
     statusText: {
       fontSize: 12,
       fontWeight: '500',
@@ -100,9 +123,11 @@ export default function TimsPassCard({ pass, onStatusChange }: TimsPassCardProps
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.2,
       shadowRadius: 4,
-      elevation: 5,
-      zIndex: 1000,
+      elevation: 10,
+      zIndex: 9999,
       minWidth: 120,
+      borderWidth: 1,
+      borderColor: colorScheme === 'dark' ? '#555' : '#e0e0e0',
     },
     dropdownItem: {
       flexDirection: 'row',
@@ -170,25 +195,20 @@ export default function TimsPassCard({ pass, onStatusChange }: TimsPassCardProps
       fontWeight: '500',
       color: colorScheme === 'dark' ? '#ffffff' : colors.text,
     },
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.3)',
-    },
   });
 
-  const statusOptions = [
+  const statusOptions: { value: 'pending' | 'approved' | 'rejected'; label: string; color: string }[] = [
     { value: 'pending', label: 'Pending', color: colors.warning },
     { value: 'approved', label: 'Approved', color: colors.success },
     { value: 'rejected', label: 'Rejected', color: colors.error },
   ];
+  const currentStatusColor = getStatusColor(currentStatus);
+  const currentStatusLabel = statusOptions.find((option) => option.value === currentStatus)?.label ?? currentStatus;
 
   return (
     <>
       <View style={styles.card}>
         <View style={styles.header}>
-           <Text style={styles.cardNumber}>
-            { `TIMS-${pass.id}`}
-          </Text>
           <Text style={styles.cardNumber}>
             {pass.tims_card_no || `TIMS-${pass.id}`}
           </Text>
@@ -197,24 +217,34 @@ export default function TimsPassCard({ pass, onStatusChange }: TimsPassCardProps
             <TouchableOpacity
               style={[
                 styles.statusButton,
-                { borderColor: getStatusColor(pass.status) }
+                { borderColor: currentStatusColor },
+                isUpdating && styles.statusButtonDisabled
               ]}
-              onPress={() => setShowStatusMenu(!showStatusMenu)}
+              onPress={() => !isUpdating && setShowStatusMenu(!showStatusMenu)}
+              disabled={isUpdating}
             >
               <Ionicons 
-                name={getStatusIcon(pass.status)} 
+                name={getStatusIcon(currentStatus)} 
                 size={14} 
-                color={getStatusColor(pass.status)} 
+                color={currentStatusColor} 
               />
-              <Text style={[styles.statusText, { color: getStatusColor(pass.status) }]}>
-                {pass.status}
+              <Text style={[styles.statusText, { color: currentStatusColor }]}>
+                {currentStatusLabel}
               </Text>
-              <Ionicons 
-                name="chevron-down" 
-                size={12} 
-                color={getStatusColor(pass.status)} 
-                style={{ marginLeft: 4 }}
-              />
+              {isUpdating ? (
+                <ActivityIndicator 
+                  size="small" 
+                  color={currentStatusColor}
+                  style={{ marginLeft: 4 }}
+                />
+              ) : (
+                <Ionicons 
+                  name="chevron-down" 
+                  size={12} 
+                  color={currentStatusColor} 
+                  style={{ marginLeft: 4 }}
+                />
+              )}
             </TouchableOpacity>
 
             {showStatusMenu && (
@@ -223,9 +253,26 @@ export default function TimsPassCard({ pass, onStatusChange }: TimsPassCardProps
                   <TouchableOpacity
                     key={option.value}
                     style={styles.dropdownItem}
-                    onPress={() => {
-                      onStatusChange(option.value as 'pending' | 'approved' | 'rejected');
-                      setShowStatusMenu(false);
+                    disabled={isUpdating}
+                    onPress={async () => {
+                      console.log('TimsPassCard: Dropdown item pressed:', option.value);
+                      if (option.value !== currentStatus) {
+                        try {
+                          console.log('TimsPassCard: Updating status from', currentStatus, 'to', option.value);
+                          setIsUpdating(true);
+                          setShowStatusMenu(false);
+                          await onStatusChange(option.value as 'pending' | 'approved' | 'rejected');
+                          console.log('TimsPassCard: Status updated successfully');
+                          setCurrentStatus(option.value as 'pending' | 'approved' | 'rejected');
+                        } catch (error) {
+                          console.error('TimsPassCard: Failed to update status:', error);
+                          Alert.alert('Error', 'Failed to update status. Please try again.');
+                        } finally {
+                          setIsUpdating(false);
+                        }
+                      } else {
+                        setShowStatusMenu(false);
+                      }
                     }}
                   >
                     <Ionicons 
@@ -234,6 +281,14 @@ export default function TimsPassCard({ pass, onStatusChange }: TimsPassCardProps
                       color={option.color} 
                     />
                     <Text style={styles.dropdownItemText}>{option.label}</Text>
+                    {option.value === currentStatus && (
+                      <Ionicons 
+                        name="checkmark" 
+                        size={16} 
+                        color={option.color}
+                        style={{ marginLeft: 'auto' }}
+                      />
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -289,19 +344,6 @@ export default function TimsPassCard({ pass, onStatusChange }: TimsPassCardProps
           </View>
         </View>
       </View>
-
-      {showStatusMenu && (
-        <Modal
-          transparent
-          visible={showStatusMenu}
-          onRequestClose={() => setShowStatusMenu(false)}
-        >
-          <TouchableOpacity 
-            style={styles.overlay} 
-            onPress={() => setShowStatusMenu(false)}
-          />
-        </Modal>
-      )}
     </>
   );
 }

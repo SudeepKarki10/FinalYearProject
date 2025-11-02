@@ -5,14 +5,14 @@ import { TimsPass } from '@/types/tims';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import QRScannerModal from './QRScannerModal';
 import TimsPassCard from './TimsPassCard';
@@ -45,9 +45,13 @@ export default function AdminTimsTab() {
 
   const handleStatusChange = async (passId: number, newStatus: 'pending' | 'approved' | 'rejected') => {
     try {
+      console.log('AdminTimsTab: Updating pass', passId, 'to status', newStatus);
       await updatePassStatus(passId, newStatus);
-    } catch {
+      console.log('AdminTimsTab: Status updated successfully');
+    } catch (error) {
+      console.error('AdminTimsTab: Failed to update pass status:', error);
       Alert.alert('Error', 'Failed to update pass status');
+      throw error; // Re-throw to let the card component handle the error state
     }
   };
 
@@ -169,7 +173,9 @@ export default function AdminTimsTab() {
   const renderTimsPass = ({ item }: { item: TimsPass }) => (
     <TimsPassCard
       pass={item}
-      onStatusChange={(newStatus: 'pending' | 'approved' | 'rejected') => handleStatusChange(item.id, newStatus)}
+      onStatusChange={async (newStatus: 'pending' | 'approved' | 'rejected') => {
+        await handleStatusChange(item.id, newStatus);
+      }}
     />
   );
 

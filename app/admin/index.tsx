@@ -1,17 +1,19 @@
 import AdminSosTab from '@/components/admin/AdminSosTab';
 import AdminTimsTab from '@/components/admin/AdminTimsTab';
+import StatusDonutChart from '@/components/admin/StatusDonutChart';
 import { colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useAdminStore } from '@/store/admin-store';
 import { useAuthStore } from '@/store/auth-store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,6 +22,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'tims' | 'sos'>('tims');
   const router = useRouter();
   const { logout, token } = useAuthStore();
+  const { adminPasses, fetchAllTimsPasses } = useAdminStore();
 
   // Log admin token on component mount
   React.useEffect(() => {
@@ -27,6 +30,20 @@ export default function AdminDashboard() {
       console.log('Admin Token:', token);
     }
   }, [token]);
+
+  // Fetch TIMS passes on component mount
+  React.useEffect(() => {
+    fetchAllTimsPasses();
+  }, [fetchAllTimsPasses]);
+
+  // Calculate status counts
+  const statusCounts = React.useMemo(() => {
+    const approved = adminPasses.filter(pass => pass.status?.toLowerCase() === 'approved').length;
+    const pending = adminPasses.filter(pass => pass.status?.toLowerCase() === 'pending').length;
+    const rejected = adminPasses.filter(pass => pass.status?.toLowerCase() === 'rejected').length;
+    
+    return { approved, pending, rejected };
+  }, [adminPasses]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -119,6 +136,11 @@ export default function AdminDashboard() {
     content: {
       flex: 1,
     },
+    chartSection: {
+      backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#ffffff',
+      borderBottomWidth: 1,
+      borderBottomColor: colorScheme === 'dark' ? '#333' : '#E5E5E5',
+    },
   });
 
   const renderContent = () => {
@@ -137,12 +159,20 @@ export default function AdminDashboard() {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Admin Dashboard</Text>
-          <Text style={styles.headerSubtitle}>Manage TIMS passes and SOS alerts</Text>
         </View>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={18} color="#ffffff" />
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Status Chart */}
+      <View style={styles.chartSection}>
+        <StatusDonutChart 
+          approved={statusCounts.approved}
+          pending={statusCounts.pending}
+          rejected={statusCounts.rejected}
+        />
       </View>
 
       <View style={styles.tabContainer}>
