@@ -1,25 +1,25 @@
 import { Link, useRouter } from "expo-router";
 import {
-    AlertCircle,
-    CheckCircle,
-    Eye,
-    EyeOff,
-    Lock,
-    User,
+  AlertCircle,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Lock,
+  User,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { colors } from "../../constants/Colors";
 import { useAuthStore } from "../../store/auth-store";
@@ -55,12 +55,12 @@ export default function LoginScreen() {
     }
   }, [error]);
 
-  // Redirect if already authenticated
+  // Redirect authenticated users to onboarding first
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace("/(tabs)");
+      router.replace("/onboarding");
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, router]);
 
   // Handle success message and redirect
   useEffect(() => {
@@ -69,12 +69,12 @@ export default function LoginScreen() {
 
       // Redirect after a short delay
       const timer = setTimeout(() => {
-        router.replace("/(tabs)");
+        router.replace("/onboarding");
       }, 1000);
 
       return () => clearTimeout(timer);
     }
-  }, [successMessage]);
+  }, [successMessage, router]);
 
   const validateInputs = () => {
     if (!username.trim()) {

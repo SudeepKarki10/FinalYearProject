@@ -1,18 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-
-const API_BASE_URL = "http://192.168.0.101:8000/api";
+import { API_BASE_URL } from "../constants/config";
 
 export type UserInterests = string[];
 
 interface User {
-  id: number;  // Backend always sends numeric ID
+  id: number;  
   username: string;
   email: string;
   display_name: string;
   photo_url?: string | null;
   interests?: UserInterests;
+  role?: string;
   user?: {
     id: number;
     username: string;
@@ -32,13 +32,73 @@ interface AuthState {
   // Actions
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string, display_name: string, photo_url: string | null) => Promise<void>;
+  changePassword: (old_password: string, new_password: string) => Promise<boolean>;
+  forgotPassword: (email: string) => Promise<boolean>;
+  verifyOtp: (otp: string) => Promise<boolean>;
+  setNewPassword: (otp: string, new_password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
   clearSuccessMessage: () => void;
   initAuth: () => Promise<void>;
   checkTokenValidity: () => Promise<boolean>;
   updateUserInterests: (interests: UserInterests) => Promise<boolean | void>;
+  // Mark onboarding complete locally without network calls
+  completeOnboardingLocally: () => void;
 }
+
+
+const normalizeRole = (role: unknown): string => {
+  if (role === null || role === undefined) {
+    return 'user';
+  }
+
+  const text = String(role).trim();
+  if (text.length === 0) {
+    return 'user';
+  }
+
+  const lower = text.toLowerCase();
+
+  if (['admin', 'administrator', 'admin/officer', 'admin officer', 'officer'].includes(lower)) {
+    return 'admin';
+  }
+
+  if (['superadmin', 'super admin', 'super-admin'].includes(lower)) {
+    return 'superadmin';
+  }
+
+  if (['user', 'regular user', 'member'].includes(lower)) {
+    return 'user';
+  }
+
+  return lower;
+};
+
+export const isAdminRole = (role?: string | null): boolean => {
+  const normalized = normalizeRole(role);
+  return normalized === 'admin' || normalized === 'superadmin';
+};
+
+const extractRole = (candidate: any): string => {
+  if (!candidate) {
+    return 'user';
+  }
+
+  const potentialRoles = [
+    candidate.role,
+    candidate.profile?.role,
+    candidate.user?.role,
+    candidate.user?.profile?.role,
+  ];
+
+  for (const value of potentialRoles) {
+    if (value !== null && value !== undefined && String(value).trim().length > 0) {
+      return normalizeRole(value);
+    }
+  }
+
+  return 'user';
+};
 
 
 export const useAuthStore = create<AuthState>()(
@@ -52,52 +112,61 @@ export const useAuthStore = create<AuthState>()(
       successMessage: null,
       hasCompletedOnboarding: false,
 
-     login: async (username, password) => {
+  login: async (username, password) => {
   set({ isLoading: true, error: null, successMessage: null });
   
   try {
-    const response = await fetch(`${API_BASE_URL}/login/`, {
+  const response = await fetch(`${API_BASE_URL}auth/login/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
 
-    const data = await response.json();
-    console.log('Login response:', data);
+  const ct = response.headers.get('content-type') || '';
+  const rawText = await response.text();
+  const data = ct.includes('application/json') ? JSON.parse(rawText) : { raw: rawText } as any;
+  // Don't log response data to avoid showing sensitive info in console
+  // console.log('Login response:', data);
 
     if (!response.ok) {
       throw new Error(data.message || data.error || 'Login failed');
     }
 
     // Extract and transform nested user data
-    const { token, user: responseUser } = data;
+    const payload: any = (data && typeof data === 'object' && 'data' in data) ? (data as any).data : data;
+    const { token, user: responseUser } = payload;
+    const inner = responseUser?.user || responseUser; // support both nested and flat shapes
+    const role = extractRole(responseUser ?? inner);
     const user: User = {
-      id: responseUser.user.id,
-      username: responseUser.user.username,
-      email: responseUser.user.email,
-      display_name: responseUser.display_name,
+      id: inner.id,
+      username: inner.username,
+      email: inner.email,
+      display_name: responseUser.display_name ?? inner.display_name ?? inner.username,
       photo_url: responseUser.photo_url || null,
+      role,
       user: {
-        id: responseUser.user.id,
-        username: responseUser.user.username,
-        email: responseUser.user.email,
+        id: inner.id,
+        username: inner.username,
+        email: inner.email,
       },
       interests: responseUser.profile?.interests || [],
     };
 
     await AsyncStorage.setItem('auth_token', token);
 
+    // Admins can bypass onboarding, regular users see it after login
     set({
       user,
       token,
       isAuthenticated: true,
       isLoading: false,
       successMessage: "Login successful!",
-      hasCompletedOnboarding: user.interests !== undefined,
+      hasCompletedOnboarding: isAdminRole(role),
     });
 
   } catch (error:any) {
-    console.error('Login error:', error);
+    // Don't log to console to avoid showing errors on UI
+    // console.error('Login error:', error);
     set({
       isLoading: false,
       error: error.message || "Failed to login. Please check your credentials.",
@@ -109,34 +178,40 @@ export const useAuthStore = create<AuthState>()(
      
     
 
-      register: async (username, email, password, display_name, photo_url) => {
+    register: async (username, email, password, display_name, photo_url) => {
         set({ isLoading: true, error: null, successMessage: null });
         
         try {
-          const response = await fetch(`${API_BASE_URL}/signup/`, {
+  const response = await fetch(`${API_BASE_URL}auth/signup/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, email, password, display_name, photo_url }),
           });
 
-          const data = await response.json();
+  const ct = response.headers.get('content-type') || '';
+  const rawText = await response.text();
+  const data = ct.includes('application/json') ? JSON.parse(rawText) : { raw: rawText } as any;
 
           if (!response.ok) {
             throw new Error(data.message || data.error || 'Registration failed');
           }
 
           // Extract and transform nested user data
-          const { token, user: responseUser } = data;
+          const payload: any = (data && typeof data === 'object' && 'data' in data) ? (data as any).data : data;
+          const { token, user: responseUser } = payload;
+          const inner = responseUser?.user || responseUser;
+          const role = extractRole(responseUser ?? inner);
           const user: User = {
-            id: responseUser.user.id,
-            username: responseUser.user.username,
-            email: responseUser.user.email,
-            display_name: responseUser.display_name,
+            id: inner.id,
+            username: inner.username,
+            email: inner.email,
+            display_name: responseUser.display_name ?? inner.display_name ?? inner.username,
             photo_url: responseUser.photo_url || null,
+            role,
             user: {
-              id: responseUser.user.id,
-              username: responseUser.user.username,
-              email: responseUser.user.email,
+              id: inner.id,
+              username: inner.username,
+              email: inner.email,
             },
             interests: undefined, // New users don't have interests yet
           };
@@ -149,16 +224,105 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
             successMessage: "Registration successful!",
-            hasCompletedOnboarding: false,
+            hasCompletedOnboarding: isAdminRole(role),
           });
 
         } catch (error:any) {
-          console.error('Registration error:', error);
+          // Don't log to console to avoid showing errors on UI
+          // console.error('Registration error:', error);
           set({
             isLoading: false,
             error: error.message || "Failed to register. Please try again.",
           });
           throw error;
+        }
+      },
+
+      changePassword: async (old_password, new_password) => {
+        const { token } = get();
+        if (!token) {
+          set({ error: 'Authentication required' });
+          return false;
+        }
+        set({ isLoading: true, error: null, successMessage: null });
+        try {
+          const resp = await fetch(`${API_BASE_URL}auth/change_password/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${token}`,
+            },
+            body: JSON.stringify({ old_password, new_password }),
+          });
+          const raw = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(raw?.message || raw?.error || 'Failed to change password');
+          }
+          set({ isLoading: false, successMessage: raw?.message || 'Password changed successfully' });
+          return true;
+        } catch (err: any) {
+          set({ isLoading: false, error: err?.message || 'Failed to change password' });
+          return false;
+        }
+      },
+
+      forgotPassword: async (email) => {
+        set({ isLoading: true, error: null, successMessage: null });
+        try {
+          const resp = await fetch(`${API_BASE_URL}auth/forgot_password/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+          const raw = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(raw?.message || raw?.error || 'Failed to request password reset');
+          }
+          set({ isLoading: false, successMessage: raw?.message || 'OTP sent to email' });
+          return true;
+        } catch (err: any) {
+          set({ isLoading: false, error: err?.message || 'Failed to request password reset' });
+          return false;
+        }
+      },
+
+      verifyOtp: async (otp) => {
+        set({ isLoading: true, error: null, successMessage: null });
+        try {
+          const resp = await fetch(`${API_BASE_URL}auth/verify_otp/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp }),
+          });
+          const raw = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(raw?.message || raw?.error || 'Failed to verify OTP');
+          }
+          set({ isLoading: false, successMessage: raw?.message || 'OTP verified' });
+          return true;
+        } catch (err: any) {
+          set({ isLoading: false, error: err?.message || 'Failed to verify OTP' });
+          return false;
+        }
+      },
+
+      setNewPassword: async (otp, new_password) => {
+        set({ isLoading: true, error: null, successMessage: null });
+        try {
+          const resp = await fetch(`${API_BASE_URL}auth/set_new_password/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp, new_password }),
+          });
+          const raw = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(raw?.message || raw?.error || 'Failed to set new password');
+          }
+          set({ isLoading: false, successMessage: raw?.message || 'Password reset successful' });
+          return true;
+        } catch (err: any) {
+          set({ isLoading: false, error: err?.message || 'Failed to set new password' });
+          return false;
         }
       },
 
@@ -187,10 +351,12 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             isLoading: false,
             successMessage: "Logged out successfully",
+            hasCompletedOnboarding: false,
           });
 
         } catch (error:any) {
-          console.error('Logout error:', error);
+          // Don't log to console to avoid showing errors on UI
+          // console.error('Logout error:', error);
           set({
             isLoading: false,
             error: error.message || "Failed to logout. Please try again.",
@@ -213,11 +379,11 @@ export const useAuthStore = create<AuthState>()(
         if (!token) return false;
 
         try {
-          // Call a protected endpoint to verify token
-          const response = await fetch(`${API_BASE_URL}/verify-token`, {
+          // Call a protected endpoint to verify token (tims list requires auth)
+          const response = await fetch(`${API_BASE_URL}tims/`, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': `Token ${token}`,
               'Content-Type': 'application/json',
             },
           });
@@ -251,6 +417,16 @@ export const useAuthStore = create<AuthState>()(
       initAuth: async () => {
         try {
           const token = await AsyncStorage.getItem('auth_token');
+          const existingUser = get().user;
+          const normalizedRole = extractRole(existingUser);
+
+          if (existingUser && normalizedRole !== existingUser.role) {
+            set({ user: { ...existingUser, role: normalizedRole } });
+          }
+
+          if (isAdminRole(normalizedRole)) {
+            set({ hasCompletedOnboarding: true });
+          }
           
           if (token) {
             set({ token });
@@ -287,14 +463,19 @@ export const useAuthStore = create<AuthState>()(
           // Ensure interests is an array
           const safeInterests = Array.isArray(interests) ? interests : [];
           
-          // Send the interests array directly in the profile
+          // Structure data to match backend's UserSerializer and UserProfileSerializer expectation
           const data = {
-            "profile": {
-              "interests": safeInterests // Django will handle the JSON serialization
-            }
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            display_name: user.display_name,
+            interests: safeInterests, // Send at root level as backend expects
+            photo_url: user.photo_url
           };
 
-          const response = await fetch(`${API_BASE_URL}/users/${user.id}/`, {
+          console.log('Sending update request with data:', data);
+
+          const response = await fetch(`${API_BASE_URL}users/${user.id}/`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
@@ -303,18 +484,29 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify(data),
           });
 
+          console.log('Response status:', response.status);
+          console.log('Response OK:', response.ok);
+
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to update interests');
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
+            let errorData;
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { message: errorText };
+            }
+            throw new Error(errorData.message || `Server error: ${response.status}`);
           }
 
           const updatedUser = await response.json();
+          console.log('User updated successfully:', updatedUser);
           
-          // Safely update the user object
+          // Safely update the user object with interests from either location
           set({ 
             user: { 
               ...user, 
-              interests: updatedUser?.profile?.interests || [] 
+              interests: updatedUser?.interests || updatedUser?.profile?.interests || safeInterests
             },
             hasCompletedOnboarding: true 
           });
@@ -324,8 +516,17 @@ export const useAuthStore = create<AuthState>()(
           console.error('Error updating interests:', error);
           // Still mark onboarding as complete to prevent UI getting stuck
           set({ hasCompletedOnboarding: true });
-          return false;
+          throw error; // Re-throw to let the onboarding form handle it properly
         }
+      },
+      
+      // Locally mark onboarding as complete without contacting the server
+      completeOnboardingLocally: () => {
+        const current = get().user;
+        set({
+          user: current ? { ...current } : current,
+          hasCompletedOnboarding: true,
+        });
       },
     }),
     {
@@ -344,7 +545,7 @@ export const useAuthStore = create<AuthState>()(
 export const getAuthHeaders = () => {
   const store = useAuthStore.getState();
   return {
-    'Authorization': `Bearer ${store.token}`,
+    'Authorization': `Token ${store.token}`,
     'Content-Type': 'application/json',
   };
 };
@@ -360,7 +561,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
   return fetch(url, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${store.token}`,
+      'Authorization': `Token ${store.token}`,
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },

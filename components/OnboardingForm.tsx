@@ -1,14 +1,16 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../constants/Colors';
 import { UserInterests, useAuthStore } from '../store/auth-store';
+import { useTrekStore } from '../store/trek-store';
 
 interface InterestCategory {
   id: string;
@@ -57,9 +59,13 @@ const INTEREST_CATEGORIES: InterestCategory[] = [
 ];
 
 export default function OnboardingForm() {
-  const { updateUserInterests } = useAuthStore();
+  const { updateUserInterests, completeOnboardingLocally } = useAuthStore();
+  const { fetchRecommendedTreks } = useTrekStore();
   const [selectedInterests, setSelectedInterests] = useState<UserInterests>([]);
   const [isNavigating, setIsNavigating] = useState(false);
+
+  // Remove the useEffect that fetches recommendations before user submits interests
+  // We'll fetch recommendations after interests are submitted
 
   const toggleInterest = (interest: string) => {
     setSelectedInterests(prev => {
@@ -77,32 +83,59 @@ export default function OnboardingForm() {
     if (isNavigating) return; // Prevent multiple submissions
     
     setIsNavigating(true);
+    let recommendationsFetched = false;
     
     try {
-      // Update user interests and mark onboarding as complete
-      await updateUserInterests(selectedInterests);
-      
-      // Use setTimeout to ensure state update completes before navigation
-      setTimeout(() => {
+      // Only update interests if user has selected some
+      if (selectedInterests.length > 0) {
+        console.log('Updating user interests:', selectedInterests);
+        
         try {
-          replace('/(tabs)');
-        } catch (navError) {
-          console.error('Navigation error:', navError);
-          setIsNavigating(false);
+          const updateResult = await updateUserInterests(selectedInterests);
+          console.log('User interests update result:', updateResult);
+          
+          if (updateResult) {
+            console.log('User interests updated successfully, fetching recommendations...');
+            try {
+              // Wait a bit to ensure backend has processed the interest update
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              await fetchRecommendedTreks();
+              console.log('Recommendations fetched successfully');
+              recommendationsFetched = true;
+            } catch (recError) {
+              console.error('Failed to fetch recommendations:', recError);
+              // Continue with navigation even if recommendations fail
+            }
+          } else {
+            console.warn('Interest update returned false, but continuing...');
+          }
+        } catch (updateError) {
+          console.error('Error updating interests:', updateError);
+          // Continue with navigation even if update fails
+          console.log('Continuing despite interest update failure...');
         }
-      }, 500);
+      } else {
+        console.log('No interests selected, marking onboarding complete...');
+        completeOnboardingLocally();
+      }
     } catch (error) {
-      console.error('Failed to update interests:', error);
+      console.error('Failed in onboarding process:', error);
+      // Ensure onboarding is marked complete locally so UI can proceed
+      completeOnboardingLocally();
+    }
+    
+    // Always navigate after processing
+    try {
+      // If we successfully fetched recommendations, wait a moment to ensure they're processed
+      if (recommendationsFetched) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      console.log('Navigating to tabs...');
+      replace('/(tabs)');
+    } catch (navError) {
+      console.error('Navigation error:', navError);
+    } finally {
       setIsNavigating(false);
-      
-      // Even if the API fails, try to navigate to tabs
-      setTimeout(() => {
-        try {
-          replace('/(tabs)');
-        } catch (navError) {
-          console.error('Navigation error after API failure:', navError);
-        }
-      }, 500);
     }
   };
 
@@ -133,11 +166,45 @@ export default function OnboardingForm() {
     </View>
   );
 
+const handleSkip = async () => {
+  if (isNavigating) return;
+  
+  setIsNavigating(true);
+  
+  try {
+    console.log('Skipping onboarding...');
+  // Mark onboarding complete locally without API calls
+  completeOnboardingLocally();
+    replace('/(tabs)');
+  } catch (navError) {
+    console.error('Navigation error:', navError);
+    setIsNavigating(false);
+  }
+};
+
+
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Help us personalize your experience</Text>
-        <Text style={styles.subtitle}>What kind of treks are you interested in?</Text>
+        <View style={styles.headerContent}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Help us personalize your experience</Text>
+            <Text style={styles.subtitle}>What kind of treks are you interested in?</Text>
+          </View>
+        
+          {/* Always show skip button for onboarding */}
+          <TouchableOpacity 
+            style={styles.skipButton} 
+            onPress={handleSkip}
+            activeOpacity={0.7}
+            disabled={isNavigating}
+          >
+            <Text style={styles.skipButtonText}>
+              {isNavigating ? 'Skipping...' : 'Skip'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
@@ -154,19 +221,16 @@ export default function OnboardingForm() {
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[
-            styles.submitButton,
-            selectedInterests.length === 0 && styles.submitButtonDisabled
-          ]} 
+          style={styles.submitButton}
           onPress={handleSubmit}
-          disabled={selectedInterests.length === 0}
+          disabled={isNavigating}
         >
           <Text style={styles.submitButtonText}>
-            {selectedInterests.length === 0 ? 'Select interests to continue' : 'Continue'}
+            {isNavigating ? 'Redirecting...' : (selectedInterests.length === 0 ? 'Skip & Continue' : 'Continue')}
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -177,13 +241,48 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    paddingBottom: 0,
+    paddingBottom: 8,
+    paddingTop: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    width: '100%',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 8,
+    flex: 1,
+    paddingRight: 16, // Add space for the skip button
+  },
+  skipButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: colors.background,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    marginLeft: 8,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    zIndex: 1,
+  },
+  skipButtonText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '700',
   },
   subtitle: {
     fontSize: 16,

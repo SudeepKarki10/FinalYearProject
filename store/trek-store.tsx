@@ -1,5 +1,7 @@
+import { API_BASE_URL } from "@/constants/config";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+
 
 interface Trek {
   id: number;
@@ -54,6 +56,8 @@ interface TrekStore {
   getRecommendedTreks: () => Trek[];
 }
 
+
+
 const getAuthHeaders = async () => {
   try {
     const token = await AsyncStorage.getItem('auth_token');
@@ -80,12 +84,13 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
   fetchTreks: async () => {
     try {
       set({ loading: true, error: null });
-      const response = await fetch(`http://192.168.0.101:8000/api/treks/`);
+      const response = await fetch(`${API_BASE_URL}treks/`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data: Trek[] = await response.json();
-      set({ treks: data, loading: false });
+  const raw = await response.json();
+  const data: Trek[] = (raw && typeof raw === 'object' && 'data' in raw) ? raw.data : raw;
+  set({ treks: Array.isArray(data) ? data : [], loading: false });
     } catch (error) {
       console.error('Error fetching treks:', error);
       set({ 
@@ -97,47 +102,99 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
 
   fetchRecommendedTreks: async () => {
     try {
-      // Use regular treks endpoint if recommended endpoint isn't available
+      set({ loading: true, error: null });
+      
+      const authStore = (await import('./auth-store')).useAuthStore.getState();
+      const interests = authStore.user?.interests;
+      
+      if (!interests || interests.length === 0) {
+        console.log('No interests set; skipping fetchRecommendedTreks.');
+        set({ loading: false });
+        return;
+      }
+
+      console.log('Fetching recommendations with interests:', interests);
       const headers = await getAuthHeaders();
-      const response = await fetch(`http://192.168.0.101:8000/api/recommendations/`, {
+      
+      const response = await fetch(`${API_BASE_URL}recommendations/treks/`, {
         headers
       });
       
-      console.log('Fetching recommended treks :', response);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Recommendations API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText
+        });
+        throw new Error(`Failed to fetch recommendations: ${response.status} ${response.statusText}`);
       }
       
-      const data: Trek[] = await response.json();
+      const responseData = await response.json();
+      console.log('Recommendations API response:', responseData);
       
-      // Take the first 3 treks as recommended (or slice if less than 3)
-      const recommendations = data;
-      set({ recommendedTreks: recommendations });
+      // Handle the response structure from the backend
+      const recommendations = responseData.recommended_treks || [];
+      
+      console.log('Processed recommendations:', recommendations);
+      
+      set({ 
+        recommendedTreks: recommendations, 
+        error: null,
+        loading: false
+      });
+      
     } catch (error) {
       console.error('Error fetching recommended treks:', error);
-      set({ 
+      set((state) => ({ 
         error: error instanceof Error ? error.message : 'Failed to fetch recommended treks',
-        recommendedTreks: [] // Reset recommendations on error
-      });
+        recommendedTreks: state.recommendedTreks,
+        loading: false
+      }));
     }
   },
 
   fetchFavorites: async () => {
     try {
+      // Get authentication headers for the logged-in user
       const headers = await getAuthHeaders();
-      const response = await fetch(`http://192.168.0.101:8000/api/favorites/`, {
-        headers
-      });
+      const response = await fetch(`${API_BASE_URL}favorites/`, { headers });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json();
-      console.log('Fetched favorites data:', data);
-      const favoriteIds = new Set<number>(data.map((fav: { trek: number }) => fav.trek));
-      const favoriteTreks = data;
+      // This gets the favorites data: [{ id, trek, user }, ...]
+      const favoritesData = await response.json();
+      console.log('Fetched favorites data:', favoritesData);
+
+      // Create a Set of trek IDs from the favorites data, handling both formats
+      const favoriteIds = new Set<number>(
+        Array.isArray(favoritesData) 
+          ? favoritesData.map((fav: { trek: number | { id: number } }) => 
+              typeof fav.trek === 'number' ? fav.trek : fav.trek.id)
+          : favoritesData.data 
+            ? favoritesData.data.map((fav: { trek: number | { id: number } }) => 
+                typeof fav.trek === 'number' ? fav.trek : fav.trek.id)
+            : []
+      );
       console.log('Mapped favorite trek IDs:', Array.from(favoriteIds));
+
+      // Get the full list of all treks from the store's state
+      const allTreks = get().treks;
+      
+      // If treks haven't been fetched yet, fetch them first
+      if (allTreks.length === 0) {
+        console.log('Fetching treks before mapping favorites...');
+        await get().fetchTreks();
+      }
+
+      // Filter the full list of treks to get only the favorited ones
+      const favoriteTreks = get().treks.filter(trek => favoriteIds.has(trek.id));
+      console.log('Mapped favorite treks:', favoriteTreks);
+      
+      // Set both the IDs and the full trek objects
       set({ favoriteIds, favoriteTreks });
     } catch (error) {
       console.error('Error fetching favorites:', error);
@@ -157,12 +214,12 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
         throw new Error('User not authenticated');
       }
       const userId = user.user?.id || user.id;
-
+console.log("header is :", headers);
       let response;
       if (isFavorited) {
         console.log('Attempting to remove favorite for trek:', trekId);
         // First get the favorite ID
-        const favResponse = await fetch(`http://192.168.0.101:8000/api/favorites/`, {
+        const favResponse = await fetch(`${API_BASE_URL}favorites/`, {
           headers
         });
         
@@ -189,18 +246,17 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
         }
 
         // DELETE request with the favorite ID
-        response = await fetch(`http://192.168.0.101:8000/api/favorites/${favorite.id}/`, {
+        response = await fetch(`${API_BASE_URL}favorites/${favorite.id}/`, {
           method: 'DELETE',
           headers
         });
       } else {
         // POST request
-        response = await fetch(`http://192.168.0.101:8000/api/favorites/`, {
+        response = await fetch(`${API_BASE_URL}favorites/`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            user: userId,
-            trek: trekId
+            trek_id: trekId
           })
         });
       }

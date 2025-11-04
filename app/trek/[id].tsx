@@ -1,4 +1,5 @@
 import { ThemedText } from '@/components/ThemedText';
+import TrekMapView from '@/components/TrekMapView';
 import { useTrekStore } from '@/store/trek-store';
 import { useTrekDetailStore } from '@/store/trek-store-single';
 import { Ionicons } from '@expo/vector-icons';
@@ -109,6 +110,8 @@ export default function TrekDetailsPage() {
               {currentTrek.description}
             </ThemedText>
             
+    
+            
             <View style={styles.infoGrid}>
               <View style={styles.infoItem}>
                 <Ionicons name="triangle-outline" size={20} color="#4A90E2" />
@@ -148,6 +151,18 @@ export default function TrekDetailsPage() {
                 </View>
               </View>
             </View>
+
+             <View style={styles.mapSection}>
+              <ThemedText style={styles.sectionTitle}>Trek Route</ThemedText>
+              {currentTrek.itinerary_points && currentTrek.itinerary_points.length > 0 ? (
+                <TrekMapView trek={currentTrek} />
+              ) : (
+                <View style={styles.noMapContainer}>
+                  <ThemedText style={styles.noMapText}>Map data not available for this trek</ThemedText>
+                </View>
+              )}
+            </View>
+
           </View>
         );
 
@@ -513,5 +528,29 @@ const styles = StyleSheet.create({
   gearText: {
     fontSize: 16,
     color: '#333',
+  },
+  mapSection: {
+    marginVertical: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  noMapContainer: {
+    width: "100%",
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  noMapText: {
+    color: '#6c757d',
+    fontSize: 16,
+    textAlign: "center",
   },
 });

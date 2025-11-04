@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { API_BASE_URL } from '../constants/config';
 
 interface Trek {
   id: number;
@@ -58,13 +59,14 @@ export const useTrekDetailStore = create<TrekDetailStore>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      const response = await fetch(`http://192.168.0.101:8000/api/treks/${id}/`);
+      const response = await fetch(`${API_BASE_URL}treks/${id}/`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data: Trek = await response.json();
+  const raw = await response.json();
+  const data: Trek = (raw && typeof raw === 'object' && 'data' in raw) ? raw.data : raw;
       
       set({
         currentTrek: data,

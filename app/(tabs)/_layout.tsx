@@ -1,14 +1,23 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/HapticTab';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { colors } from '@/constants/Colors';
+import { isAdminRole, useAuthStore } from '@/store/auth-store';
 
 export default function TabLayout() {
   const theme =  colors.primary;
+  const router = useRouter();
+  const userRole = useAuthStore((state) => state.user?.role);
+
+  useEffect(() => {
+    if (isAdminRole(userRole)) {
+      router.replace('/admin');
+    }
+  }, [userRole, router]);
 
   const screenOptions: any = {
     tabBarActiveTintColor: theme,
@@ -38,10 +47,24 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="social"
+        options={{
+          title: 'Social',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="globe" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Emergency',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="sos" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="transit-pass"
+        options={{
+          title: 'Apply TIMS',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text.fill" color={color} />,
         }}
       />
        {/* <Tabs.Screen
@@ -51,6 +74,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
         }}
       /> */}
+       <Tabs.Screen
+        name="favorites"
+        options={{
+          title: 'Favorites',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="heart.fill" color={color} />,
+        }}
+      />
        <Tabs.Screen
         name="profile"
         options={{
