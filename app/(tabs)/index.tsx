@@ -11,7 +11,7 @@ import { useTrekStore } from "../../store/trek-store";
 import { Trek } from "../../types";
 
 export default function MainPage() {
-  const { fetchTreks, treks, fetchRecommendedTreks, recommendedTreks } = useTrekStore();
+  const { fetchTreks, treks, fetchRecommendedTreks, recommendedTreks, getMostFamousTreks } = useTrekStore();
   const { isAuthenticated, hasCompletedOnboarding, user } = useAuthStore();
   const router = useRouter();
   
@@ -77,6 +77,19 @@ export default function MainPage() {
           <FlatList
             horizontal
             data={treks}
+            renderItem={renderTrekCard}
+            keyExtractor={(item) => item.id.toString()}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.treksList}
+          />
+        </View>
+
+        {/* Most Famous Treks Section */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Popular Treks</ThemedText>
+          <FlatList
+            horizontal
+            data={getMostFamousTreks()}
             renderItem={renderTrekCard}
             keyExtractor={(item) => item.id.toString()}
             showsHorizontalScrollIndicator={false}

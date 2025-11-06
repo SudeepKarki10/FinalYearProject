@@ -180,6 +180,11 @@ export default function TransitPassScreen() {
     } catch (err: any) {
       console.log('Image upload error:', err);
       setLocalError('Failed to upload image. Please try again.');
+      
+      // Clear error after 3 seconds
+      setTimeout(() => {
+        setLocalError('');
+      }, 3000);
     } finally {
       setUploading(false);
     }
@@ -340,6 +345,13 @@ export default function TransitPassScreen() {
               </View>
             )}
 
+            {localError ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={20} color={colors.error} style={styles.messageIcon} />
+                <Text style={styles.errorText}>{localError}</Text>
+              </View>
+            ) : null}
+
           <Text style={styles.sectionTitle}>Personal Information</Text>
           
           <TextInput
@@ -374,65 +386,114 @@ export default function TransitPassScreen() {
             placeholderTextColor={colors.textSecondary}
           />
 
-          <Text style={styles.sectionTitle}>Gender</Text>
-          <View style={styles.radioGroup}>
-            {genderOptions.map(opt => (
-              <TouchableOpacity
-                key={opt.value}
-                style={styles.radioRow}
-                onPress={() => setFormData(p => ({ ...p, gender: opt.value }))}
-              >
-                <View
+          <View style={styles.genderContainer}>
+            <Text style={styles.genderTitle}>Gender</Text>
+            <View style={styles.radioGroup}>
+              {genderOptions.map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
                   style={[
-                    styles.radioCircle,
-                    formData.gender === opt.value && styles.radioFilled,
+                    styles.radioRow,
+                    formData.gender === opt.value && styles.radioRowSelected
                   ]}
-                />
-                <Text style={styles.radioLabel}>{opt.label}</Text>
-              </TouchableOpacity>
-            ))}
+                  onPress={() => setFormData(p => ({ ...p, gender: opt.value }))}
+                >
+                  <View
+                    style={[
+                      styles.radioCircle,
+                      formData.gender === opt.value && styles.radioFilled,
+                    ]}
+                  />
+                  <Text style={[
+                    styles.radioLabel,
+                    formData.gender === opt.value && styles.radioLabelSelected
+                  ]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           <TouchableOpacity
             style={styles.dateButton}
             onPress={() => setShowDatePicker('date_of_birth')}
           >
-            <Text style={styles.dateButtonText}>
-              Date of Birth: {formData.date_of_birth.toLocaleDateString()}
-            </Text>
+            <View style={styles.dateButtonContent}>
+              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              <View style={styles.dateTextContainer}>
+                <Text style={styles.dateLabel}>Date of Birth</Text>
+                <Text style={styles.dateValue}>{formData.date_of_birth.toLocaleDateString()}</Text>
+              </View>
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+            </View>
           </TouchableOpacity>
-          {(showDatePicker === 'date_of_birth' || Platform.OS === 'ios') && (
+          {showDatePicker === 'date_of_birth' && Platform.OS !== 'ios' && (
             <DateTimePicker
               testID="dateOfBirthPicker"
               value={formData.date_of_birth}
               mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              display="default"
               onChange={(event, date) => handleDateChange(event, date, 'date_of_birth')}
               textColor={colors.text}
               themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
               accentColor={colors.primary}
-              style={{ backgroundColor: colors.card, width: '100%' }}
             />
+          )}
+          {Platform.OS === 'ios' && showDatePicker === 'date_of_birth' && (
+            <View style={styles.iosDatePickerContainer}>
+              <DateTimePicker
+                testID="dateOfBirthPicker"
+                value={formData.date_of_birth}
+                mode="date"
+                display="compact"
+                onChange={(event, date) => handleDateChange(event, date, 'date_of_birth')}
+                textColor={colors.text}
+                themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
+                accentColor={colors.primary}
+                style={styles.iosDatePicker}
+              />
+            </View>
           )}
 
           <Text style={styles.sectionTitle}>Trek Information</Text>
 
-          <DropdownSelect
-            label="Trek Area"
-            placeholder="Select a trek…"
-            options={trekOptions}
-            optionLabel="label"
-            optionValue="value"
-            selectedValue={formData.trekker_area}
-            onValueChange={(value) => {
-              if (typeof value === 'string') {
-                const selected = trekOptions.find(t => t.value === value);
-                if (selected) handleTrekSelection(selected);
-              }
-            }}
-            primaryColor={colors.primary}
-            dropdownStyle={{ borderWidth: 0 }}
-          />
+          <View style={styles.dropdownContainer}>
+            <DropdownSelect
+              label="Trek Area"
+              placeholder="Select a trek…"
+              options={trekOptions}
+              optionLabel="label"
+              optionValue="value"
+              selectedValue={formData.trekker_area}
+              onValueChange={(value) => {
+                if (typeof value === 'string') {
+                  const selected = trekOptions.find(t => t.value === value);
+                  if (selected) handleTrekSelection(selected);
+                }
+              }}
+              primaryColor={colors.primary}
+              dropdownStyle={{ 
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 12,
+                backgroundColor: colors.card,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+              }}
+              dropdownContainerStyle={{
+                borderRadius: 12,
+                borderColor: colors.border,
+              }}
+              placeholderStyle={{
+                color: colors.textSecondary,
+                fontSize: 16,
+              }}
+              selectedItemStyle={{
+                color: colors.text,
+                fontSize: 16,
+                fontWeight: '500',
+              }}
+            />
+          </View>
 
           <TextInput
             style={styles.input}
@@ -446,44 +507,86 @@ export default function TransitPassScreen() {
             style={styles.dateButton}
             onPress={() => setShowDatePicker('entry_date')}
           >
-            <Text style={styles.dateButtonText}>
-              Entry Date: {formData.entry_date.toLocaleDateString()}
-            </Text>
+            <View style={styles.dateButtonContent}>
+              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              <View style={styles.dateTextContainer}>
+                <Text style={styles.dateLabel}>Entry Date</Text>
+                <Text style={styles.dateValue}>{formData.entry_date.toLocaleDateString()}</Text>
+              </View>
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+            </View>
           </TouchableOpacity>
-          {(showDatePicker === 'entry_date' || Platform.OS === 'ios') && (
+          {showDatePicker === 'entry_date' && Platform.OS !== 'ios' && (
             <DateTimePicker
               testID="entryDatePicker"
               value={formData.entry_date}
               mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              display="default"
               onChange={(event, date) => handleDateChange(event, date, 'entry_date')}
+              minimumDate={new Date()}
               textColor={colors.text}
               themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
               accentColor={colors.primary}
-              style={{ backgroundColor: colors.card, width: '100%' }}
             />
+          )}
+          {Platform.OS === 'ios' && showDatePicker === 'entry_date' && (
+            <View style={styles.iosDatePickerContainer}>
+              <DateTimePicker
+                testID="entryDatePicker"
+                value={formData.entry_date}
+                mode="date"
+                display="compact"
+                onChange={(event, date) => handleDateChange(event, date, 'entry_date')}
+                minimumDate={new Date()}
+                textColor={colors.text}
+                themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
+                accentColor={colors.primary}
+                style={styles.iosDatePicker}
+              />
+            </View>
           )}
 
           <TouchableOpacity
             style={styles.dateButton}
             onPress={() => setShowDatePicker('exit_date')}
           >
-            <Text style={styles.dateButtonText}>
-              Exit Date: {formData.exit_date.toLocaleDateString()}
-            </Text>
+            <View style={styles.dateButtonContent}>
+              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              <View style={styles.dateTextContainer}>
+                <Text style={styles.dateLabel}>Exit Date</Text>
+                <Text style={styles.dateValue}>{formData.exit_date.toLocaleDateString()}</Text>
+              </View>
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+            </View>
           </TouchableOpacity>
-          {(showDatePicker === 'exit_date' || Platform.OS === 'ios') && (
+          {showDatePicker === 'exit_date' && Platform.OS !== 'ios' && (
             <DateTimePicker
               testID="exitDatePicker"
               value={formData.exit_date}
               mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              display="default"
               onChange={(event, date) => handleDateChange(event, date, 'exit_date')}
+              minimumDate={new Date()}
               textColor={colors.text}
               themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
               accentColor={colors.primary}
-              style={{ backgroundColor: colors.card, width: '100%' }}
             />
+          )}
+          {Platform.OS === 'ios' && showDatePicker === 'exit_date' && (
+            <View style={styles.iosDatePickerContainer}>
+              <DateTimePicker
+                testID="exitDatePicker"
+                value={formData.exit_date}
+                mode="date"
+                display="compact"
+                onChange={(event, date) => handleDateChange(event, date, 'exit_date')}
+                minimumDate={new Date()}
+                textColor={colors.text}
+                themeVariant={colors.background === '#000000' ? 'dark' : 'light'}
+                accentColor={colors.primary}
+                style={styles.iosDatePicker}
+              />
+            </View>
           )}
 
           <Text style={styles.sectionTitle}>Nepal Contact</Text>
@@ -586,11 +689,12 @@ export default function TransitPassScreen() {
 
           {Object.keys(transitPassCost).length > 0 && (
             <View style={styles.costContainer}>
-              <Text style={styles.costTitle}>Transit Pass Cost Breakdown:</Text>
+              <Text style={styles.costTitle}>Transit Pass Cost Breakdown</Text>
               {Object.entries(transitPassCost).map(([key, value]) => (
-                <Text key={key} style={styles.costItem}>
-                  {key}: NPR {value}
-                </Text>
+                <View key={key} style={styles.costItemContainer}>
+                  <Text style={styles.costItemLabel}>{key}</Text>
+                  <Text style={styles.costItemValue}>NPR {value}</Text>
+                </View>
               ))}
             </View>
           )}
@@ -615,6 +719,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
     overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
   },
   profileImage: {
     width: '100%',
@@ -646,11 +753,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  errorContainer: {
+    backgroundColor: `${colors.error || '#FF6B6B'}20`,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   messageIcon: {
     marginRight: 8,
   },
   successText: {
     color: colors.success,
+    fontSize: 14,
+    flex: 1,
+  },
+  errorText: {
+    color: colors.error || '#FF6B6B',
     fontSize: 14,
     flex: 1,
   },
@@ -674,21 +794,31 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   formContainer: {
-    padding: 16,
+    padding: 20,
+    paddingBottom: 40,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.text,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 24,
+    marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   input: {
     backgroundColor: colors.card,
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 12,
     color: colors.text,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dropdownContainer: {
+    marginBottom: 12,
   },
 
   placeholderStyle: {
@@ -699,41 +829,117 @@ const styles = StyleSheet.create({
   },
   dateButton: {
     backgroundColor: colors.card,
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dateButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  dateValue: {
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  iosDatePickerContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iosDatePicker: {
+    backgroundColor: 'transparent',
   },
   dateButtonText: {
     color: colors.text,
   },
   costContainer: {
     backgroundColor: colors.card,
-    padding: 16,
-    borderRadius: 8,
+    padding: 20,
+    borderRadius: 12,
     marginTop: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 2,
   },
   costTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   costItem: {
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: '500',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  costItemContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingVertical: 4,
+  },
+  costItemLabel: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+  },
+  costItemValue: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '700',
   },
   submitButton: {
     backgroundColor: colors.primary,
-    padding: 16,
-    borderRadius: 8,
+    padding: 18,
+    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 32,
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
   submitButtonText: {
     color: colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   pickerContainer: {
     backgroundColor: colors.card,
@@ -745,16 +951,57 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     color: colors.text,
   },
-  radioGroup: { marginBottom: 12 },
-  radioRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 6 },
+  genderContainer: {
+    backgroundColor: colors.card,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  genderTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  radioGroup: { 
+    marginBottom: 0,
+    gap: 8,
+  },
+  radioRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  radioRowSelected: {
+    backgroundColor: `${colors.primary}15`,
+    borderColor: colors.primary,
+  },
   radioCircle: {
     height: 20,
     width: 20,
     borderRadius: 10,
     borderWidth: 2,
     borderColor: colors.primary,
-    marginRight: 8,
+    marginRight: 12,
   },
-  radioFilled: { backgroundColor: colors.primary },
-  radioLabel: { color: colors.text, fontSize: 16 },
+  radioFilled: { 
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  radioLabel: { 
+    color: colors.text, 
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  radioLabelSelected: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
 });

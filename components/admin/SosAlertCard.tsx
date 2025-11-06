@@ -15,6 +15,7 @@ import {
 interface SosAlertCardProps {
   alert: SOSAlert;
   onStatusChange: (status: 'sent' | 'inprogress' | 'resolved') => Promise<void>;
+  isSelected?: boolean;
 }
 
 const normalizeStatus = (status?: string | null): 'sent' | 'inprogress' | 'resolved' => {
@@ -29,7 +30,7 @@ const normalizeStatus = (status?: string | null): 'sent' | 'inprogress' | 'resol
   }
 };
 
-export default function SosAlertCard({ alert, onStatusChange }: SosAlertCardProps) {
+export default function SosAlertCard({ alert, onStatusChange, isSelected = false }: SosAlertCardProps) {
   const colorScheme = useColorScheme();
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -88,6 +89,8 @@ export default function SosAlertCard({ alert, onStatusChange }: SosAlertCardProp
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
+      borderWidth: isSelected ? 2 : 0,
+      borderColor: isSelected ? colors.primary : 'transparent',
     },
     header: {
       flexDirection: 'row',
