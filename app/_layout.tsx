@@ -31,8 +31,9 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="admin" options={{ headerShown: false }} />
+              <Stack.Screen name="profile/manage-posts" options={{ headerShown: false }} />
               <Stack.Screen name="trek/[id]" options={{ 
-                headerShown: true, 
+                headerShown: false, 
                 title: 'Trek Details'
               }} />
               <Stack.Screen name="+not-found" />

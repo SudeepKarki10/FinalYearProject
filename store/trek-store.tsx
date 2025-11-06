@@ -54,6 +54,7 @@ interface TrekStore {
   isFavorite: (trekId: number) => boolean;
   getFavoriteCount: () => number;
   getRecommendedTreks: () => Trek[];
+  getMostFamousTreks: () => Trek[];
 }
 
 
@@ -213,7 +214,6 @@ export const useTrekStore = create<TrekStore>((set, get) => ({
       if (!user) {
         throw new Error('User not authenticated');
       }
-      const userId = user.user?.id || user.id;
 console.log("header is :", headers);
       let response;
       if (isFavorited) {
@@ -296,5 +296,20 @@ console.log("header is :", headers);
 
   getRecommendedTreks: () => {
     return get().recommendedTreks;
+  },
+
+  getMostFamousTreks: () => {
+    const famousTrekNames = [
+      'Arun Valley Trek',
+      'Tilicho Lake Trek',
+      'Annapurna Circuit Trek',
+      'Everest Base Camp Trek'
+    ];
+    
+    return get().treks.filter(trek => 
+      famousTrekNames.some(famousName => 
+        trek.name.toLowerCase().includes(famousName.toLowerCase())
+      )
+    );
   },
 }))

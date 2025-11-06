@@ -33,17 +33,18 @@ export const useSocialStore = create<SocialStore>((set, get) => ({
       set({ isLoading: true });
       
       const headers = getAuthHeaders();
-      if (!headers.Authorization) {
-        console.log('No authentication token found');
-        Alert.alert('Authentication Error', 'Please log in again');
-        return;
-      }
-      
       console.log('Fetching social posts from:', `${API_BASE_URL}posts/`);
       
       const response = await fetch(`${API_BASE_URL}posts/`, {
-        headers,
+        headers: headers.Authorization ? headers : { 'Content-Type': 'application/json' },
       });
+      
+      // Handle 401 Unauthorized for non-authenticated users
+      if (response.status === 401) {
+        console.log('Posts require authentication, showing empty state for non-authenticated users');
+        set({ posts: [] });
+        return;
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

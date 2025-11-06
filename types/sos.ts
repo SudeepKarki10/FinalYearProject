@@ -1,7 +1,7 @@
 interface ContactService {
   name: string;
   email: string;
-  phone: string;
+  phone?: string; // Made optional to handle cases where phone might not be available
   type: string;
   fallback: boolean;
 }
@@ -14,7 +14,7 @@ interface GooglePlace {
   distance_km: number;
   latitude: number;
   longitude: number;
-  phone: string;
+  phone?: string; // Made optional as phone numbers might not always be available
   website: string;
   email: string;
   address: string;

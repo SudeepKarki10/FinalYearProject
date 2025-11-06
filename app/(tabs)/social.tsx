@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, RefreshControl, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import CommentsModal, { CommentsModalRef } from '../../components/social/CommentsModal';
 import { CreatePostButton } from '../../components/social/CreatePostButton';
 import { CreatePostModal } from '../../components/social/CreatePostModal';
@@ -35,10 +35,25 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 8,
   },
+  loginPrompt: {
+    backgroundColor: '#E3F2FD',
+    padding: 12,
+    marginHorizontal: 8,
+    marginTop: 8,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  loginPromptText: {
+    fontSize: 14,
+    color: '#1976D2',
+    textAlign: 'center',
+  },
 });
 
 export default function SocialScreen() {
   const { posts, isLoading, fetchPosts, likePost, addComment } = useSocialStore();
+  const { isAuthenticated, token } = useAuthStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
   const commentsModalRef = useRef<CommentsModalRef>(null);
@@ -50,15 +65,39 @@ export default function SocialScreen() {
     fetchPosts();
   }, [fetchPosts]);
 
+  const showAuthAlert = (action: string) => {
+    Alert.alert(
+      'Login Required',
+      `You should be logged in to ${action}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => {
+          // Navigate to login - you might want to use router here
+          console.log('Navigate to login');
+        }}
+      ]
+    );
+  };
+
   const handleLikePost = useCallback(async (postId: number) => {
+    if (!isAuthenticated || !token) {
+      showAuthAlert('like posts');
+      return;
+    }
+    
     try {
       await likePost(postId);
     } catch (error) {
       console.error('Failed to like post:', error);
     }
-  }, [likePost]);
+  }, [likePost, isAuthenticated, token]);
   
   const handleAddComment = useCallback(async (postId: number, comment: string) => {
+    if (!isAuthenticated || !token) {
+      showAuthAlert('comment on posts');
+      return;
+    }
+    
     try {
       await addComment(postId, comment);
       setSelectedPostId(null); // Close comment input after submitting
@@ -67,17 +106,33 @@ export default function SocialScreen() {
     } catch (error) {
       console.error('Failed to add comment:', error);
     }
-  }, [addComment, fetchPosts]);
+  }, [addComment, fetchPosts, isAuthenticated, token]);
   
   // Show comments modal when comment icon or "View all comments" is clicked
   const handleOpenCommentsModal = useCallback((postId: number) => {
+    if (!isAuthenticated || !token) {
+      showAuthAlert('view comments');
+      return;
+    }
     commentsModalRef.current?.open(postId);
-  }, []);
+  }, [isAuthenticated, token]);
   
   const handleToggleComment = useCallback((postId: number) => {
+    if (!isAuthenticated || !token) {
+      showAuthAlert('comment on posts');
+      return;
+    }
     // Show comments modal instead of toggling input visibility
     commentsModalRef.current?.open(postId);
-  }, []);
+  }, [isAuthenticated, token]);
+
+  const handleCreatePost = useCallback(() => {
+    if (!isAuthenticated || !token) {
+      showAuthAlert('create posts');
+      return;
+    }
+    setShowCreateModal(true);
+  }, [isAuthenticated, token]);
 
   const EmptyComponent = () => {
     // Only show when we're not loading and there are no posts
@@ -85,10 +140,22 @@ export default function SocialScreen() {
     
     return (
       <View style={styles.emptyContainer}>
-        <ThemedText style={{ fontSize: 18, marginBottom: 10 }}>No posts yet</ThemedText>
-        <ThemedText style={{ textAlign: 'center', color: themeColor as string }}>
-          Be the first one to share something with the community!
-        </ThemedText>
+        {isAuthenticated ? (
+          <>
+            <ThemedText style={{ fontSize: 18, marginBottom: 10 }}>No posts yet</ThemedText>
+            <ThemedText style={{ textAlign: 'center', color: themeColor as string }}>
+              Be the first one to share something with the community!
+            </ThemedText>
+          </>
+        ) : (
+          <>
+            <ThemedText style={{ fontSize: 18, marginBottom: 10 }}>Login Required</ThemedText>
+            <ThemedText style={{ textAlign: 'center', color: themeColor as string }}>
+              Posts are only available to logged-in users.
+            </ThemedText>
+    
+          </>
+        )}
       </View>
     );
   };
@@ -118,20 +185,36 @@ export default function SocialScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         <View style={[styles.header, { borderBottomColor: backgroundSecondary as string }]}> 
           <ThemedText style={{ fontSize: 24, fontWeight: 'bold' }}>Feeds</ThemedText>
-          <TouchableOpacity style={styles.createIcon} onPress={() => setShowCreateModal(true)}>
-            <IconSymbol name="plus.circle.fill" size={26} color={themeColor as string} />
-          </TouchableOpacity>
+          {isAuthenticated ? (
+            <TouchableOpacity style={styles.createIcon} onPress={handleCreatePost}>
+              <IconSymbol name="plus.circle.fill" size={26} color={themeColor as string} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.createIcon} onPress={() => showAuthAlert('create posts')}>
+              <IconSymbol name="plus.circle" size={26} color={themeColor as string} />
+            </TouchableOpacity>
+          )}
         </View>
         
         {/* Create Post Modal */}
-        <CreatePostModal
-          visible={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onPostSuccess={() => {
-            setShowCreateModal(false);
-            fetchPosts();
-          }}
-        />
+        {isAuthenticated && (
+          <CreatePostModal
+            visible={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            onPostSuccess={() => {
+              setShowCreateModal(false);
+              fetchPosts();
+            }}
+          />
+        )}
+        {/* Login prompt for non-authenticated users */}
+        {!isAuthenticated && (
+          <View style={styles.loginPrompt}>
+            <ThemedText style={styles.loginPromptText}>
+              You can view posts, like, comment, and create posts , login to continue.
+            </ThemedText>
+          </View>
+        )}
         
         <FlatList
           data={posts}
@@ -159,13 +242,19 @@ export default function SocialScreen() {
         />
         
         {/* Floating action button to create post */}
-        <CreatePostButton onPress={() => setShowCreateModal(true)} />
+        {isAuthenticated ? (
+          <CreatePostButton onPress={handleCreatePost} />
+        ) : (
+          <CreatePostButton onPress={() => showAuthAlert('create posts')} />
+        )}
         
         {/* Comments Modal */}
-        <CommentsModal 
-          ref={commentsModalRef}
-          onClose={() => fetchPosts()} // Refresh posts when modal is closed
-        />
+        {isAuthenticated && (
+          <CommentsModal 
+            ref={commentsModalRef}
+            onClose={() => fetchPosts()} // Refresh posts when modal is closed
+          />
+        )}
       </SafeAreaView>
     </ThemedView>
   );

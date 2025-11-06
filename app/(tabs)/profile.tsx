@@ -14,7 +14,7 @@ import { useAuthStore } from "../../store/auth-store";
 import { useTrekStore } from "../../store/trek-store";
 
 export default function ProfileScreen() {
-  const { isAuthenticated, user, logout } = useAuthStore();
+  const { isAuthenticated, user, logout, token } = useAuthStore();
   const { fetchFavorites, getFavoriteCount } = useTrekStore();
   const router = useRouter();
 
@@ -23,6 +23,23 @@ export default function ProfileScreen() {
       fetchFavorites();
     }
   }, [isAuthenticated, fetchFavorites]);
+
+  // Console log token for normal users when they visit profile page
+  useEffect(() => {
+    if (isAuthenticated && user && token) {
+      const isNormalUser = user.role === 'user' || !user.role || user.role === 'regular user';
+      
+      if (isNormalUser) {
+        console.log('=== NORMAL USER PROFILE VISIT ===');
+        console.log('User:', user.display_name || user.username);
+        console.log('User Role:', user.role || 'user (default)');
+        console.log('Token:', token);
+        console.log('Token length:', token.length);
+        console.log('Token starts with:', token.substring(0, 10) + '...');
+        console.log('================================');
+      }
+    }
+  }, [isAuthenticated, user, token]);
 
   const handleActivityPress = (activity: string) => {
     switch (activity) {
@@ -81,8 +98,8 @@ export default function ProfileScreen() {
         <View style={styles.avatarContainer}>
           <Image 
             source={
-              user?.photo_url
-                ? { uri: user.photo_url }
+              user?.photo_url 
+                ? { uri: user.photo_url } 
                 : require('../../assets/images/icon.png')
             }
             style={styles.avatar}

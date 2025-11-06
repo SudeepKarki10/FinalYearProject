@@ -9,11 +9,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -166,14 +166,16 @@ export default function AdminDashboard() {
         </TouchableOpacity>
       </View>
 
-      {/* Status Chart */}
-      <View style={styles.chartSection}>
-        <StatusDonutChart 
-          approved={statusCounts.approved}
-          pending={statusCounts.pending}
-          rejected={statusCounts.rejected}
-        />
-      </View>
+      {/* Status Chart - Only show for TIMS tab */}
+      {activeTab === 'tims' && (
+        <View style={styles.chartSection}>
+          <StatusDonutChart 
+            approved={statusCounts.approved}
+            pending={statusCounts.pending}
+            rejected={statusCounts.rejected}
+          />
+        </View>
+      )}
 
       <View style={styles.tabContainer}>
         <TouchableOpacity

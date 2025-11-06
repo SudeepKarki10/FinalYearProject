@@ -1,71 +1,260 @@
 import { colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAuthStore } from '@/store/auth-store';
 import { fetchSOSAlertDetails } from '@/store/sos-store';
 import type { SOSAlert } from '@/types/sos';
+import { getFirstPhoneNumber, hasMultiplePhoneNumbers, initiatePhoneCall } from '@/utils/phoneUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
-function QuickCallButton({ phone, name, type }: { phone: string; name: string; type: string }) {
-  const handleCall = () => {
-    const phoneNumber = phone.replace(/\s+/g, ''); // Remove any spaces
-    Linking.openURL(`tel:${phoneNumber}`);
+interface ServiceContact {
+  name: string;
+  phone?: string; // Made optional since it might not always be available
+  type: string;
+}
+
+interface NearbyPlace {
+  place_id: string;
+  name: string;
+  address: string;
+  vicinity: string;
+  rating: number;
+  user_ratings_total: number;
+  latitude: number;
+  longitude: number;
+  distance_km: number;
+  phone?: string; // Made optional to match GooglePlace interface
+  website: string;
+  type: string;
+  business_status: string;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colorScheme = useColorScheme();
+  
+  const getStatusConfig = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'resolved':
+        return {
+          bg: '#E8F5E8',
+          border: '#4CAF50',
+          text: '#2E7D32',
+          icon: 'checkmark-circle' as const,
+          label: 'RESOLVED'
+        };
+      case 'in_progress':
+      case 'inprogress':
+        return {
+          bg: '#FFF3E0',
+          border: '#FF9800',
+          text: '#E65100',
+          icon: 'time' as const,
+          label: 'IN PROGRESS'
+        };
+      default:
+        return {
+          bg: '#FFEBEE',
+          border: '#F44336',
+          text: '#C62828',
+          icon: 'alert-circle' as const,
+          label: 'ACTIVE'
+        };
+    }
+  };
+
+  const config = getStatusConfig(status);
+
+  return (
+    <View style={[styles.statusBadge, { 
+      backgroundColor: colorScheme === 'dark' ? config.border + '20' : config.bg,
+      borderColor: config.border 
+    }]}>
+      <Ionicons name={config.icon} size={18} color={config.border} />
+      <Text style={[styles.statusText, { color: config.text }]}>{config.label}</Text>
+    </View>
+  );
+}
+
+function EmergencyTypeChip({ type, isPrimary = false }: { type: string; isPrimary?: boolean }) {
+  const colorScheme = useColorScheme();
+  
+  return (
+    <View style={[
+      styles.emergencyChip,
+      {
+        backgroundColor: isPrimary 
+          ? (colorScheme === 'dark' ? '#FF5252' : '#F44336')
+          : (colorScheme === 'dark' ? colors.primary + '40' : colors.primary + '20'),
+        borderColor: isPrimary 
+          ? (colorScheme === 'dark' ? '#FF1744' : '#D32F2F')
+          : colors.primary,
+      }
+    ]}>
+      <Ionicons 
+        name={isPrimary ? 'warning' : 'medical'} 
+        size={14} 
+        color={isPrimary ? '#FFFFFF' : colors.primary} 
+      />
+      <Text style={[
+        styles.emergencyChipText,
+        { color: isPrimary ? '#FFFFFF' : colors.primary }
+      ]}>
+        {type.toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
+function ContactCard({ contact, onCall }: { contact: ServiceContact; onCall: () => void }) {
+  const colorScheme = useColorScheme();
+  
+  const firstPhoneNumber = getFirstPhoneNumber(contact.phone);
+  
+  const getTypeIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'hospital':
+      case 'medical':
+        return 'medical';
+      case 'police':
+        return 'shield-checkmark';
+      case 'fire':
+        return 'flame';
+      default:
+        return 'call';
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'hospital':
+      case 'medical':
+        return '#4CAF50';
+      case 'police':
+        return '#2196F3';
+      case 'fire':
+        return '#FF5722';
+      default:
+        return colors.primary;
+    }
   };
 
   return (
     <TouchableOpacity 
-      style={styles.callButton} 
-      onPress={handleCall}
-      activeOpacity={0.7}
+      style={[styles.contactCard, {
+        backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#FFFFFF',
+        borderColor: colorScheme === 'dark' ? '#404040' : '#E0E0E0',
+        opacity: firstPhoneNumber ? 1 : 0.7
+      }]}
+      onPress={firstPhoneNumber ? onCall : undefined}
+      activeOpacity={firstPhoneNumber ? 0.7 : 1}
+      disabled={!firstPhoneNumber}
     >
-      <View style={styles.callButtonContent}>
-        <Ionicons name="call" size={24} color={colors.primary} />
-        <View style={styles.callButtonText}>
-          <Text style={styles.callButtonTitle}>{name}</Text>
-          <Text style={styles.callButtonSubtitle}>{type} • {phone}</Text>
-        </View>
+      <View style={[styles.contactIconContainer, { backgroundColor: getTypeColor(contact.type) + '20' }]}>
+        <Ionicons name={getTypeIcon(contact.type)} size={24} color={getTypeColor(contact.type)} />
       </View>
-      <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+      
+      <View style={styles.contactInfo}>
+        <Text style={[styles.contactName, { 
+          color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+        }]} numberOfLines={2}>
+          {contact.name}
+        </Text>
+        <Text style={[styles.contactType, { 
+          color: colorScheme === 'dark' ? '#B0B0B0' : colors.textSecondary 
+        }]}>
+          {contact.type.toUpperCase()}{firstPhoneNumber ? ` • ${firstPhoneNumber}` : ' • No phone available'}
+          {hasMultiplePhoneNumbers(contact.phone) && (
+            <Text style={{ fontSize: 12, fontStyle: 'italic' }}> (+more)</Text>
+          )}
+        </Text>
+      </View>
+      
+      <View style={[styles.callButton, { 
+        backgroundColor: firstPhoneNumber ? getTypeColor(contact.type) : '#CCCCCC' 
+      }]}>
+        <Ionicons 
+          name={firstPhoneNumber ? "call" : "call-outline"} 
+          size={20} 
+          color={firstPhoneNumber ? "#FFFFFF" : "#888888"} 
+        />
+      </View>
     </TouchableOpacity>
   );
 }
 
-function ContactServiceCard({ service }: { service: any }) {
-  const handleEmail = () => {
-    if (service.email) {
-      Linking.openURL(`mailto:${service.email}`);
+function NearbyPlaceCard({ place }: { place: NearbyPlace }) {
+  const colorScheme = useColorScheme();
+  
+  const firstPhoneNumber = getFirstPhoneNumber(place.phone);
+  
+  const handleCall = () => {
+    if (firstPhoneNumber) {
+      initiatePhoneCall(firstPhoneNumber);
     }
   };
 
-  const handleCall = () => {
-    if (service.phone) {
-      const phoneNumber = service.phone.replace(/\s+/g, '');
-      Linking.openURL(`tel:${phoneNumber}`);
-    }
+  const handleNavigate = () => {
+    const url = `https://maps.google.com/?q=${place.latitude},${place.longitude}`;
+    Linking.openURL(url);
   };
 
   return (
-    <View style={styles.contactCard}>
-      <View style={styles.contactHeader}>
-        <Ionicons name="person-outline" size={20} color={colors.primary} />
-        <View style={styles.contactInfo}>
-          <Text style={styles.contactName}>{service.name}</Text>
-          <Text style={styles.contactType}>{service.type} • {service.source || 'default'}</Text>
+    <View style={[styles.placeCard, {
+      backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#FFFFFF',
+      borderColor: colorScheme === 'dark' ? '#404040' : '#E0E0E0'
+    }]}>
+      <View style={styles.placeHeader}>
+        <View style={styles.placeInfo}>
+          <Text style={[styles.placeName, { 
+            color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+          }]} numberOfLines={2}>
+            {place.name}
+          </Text>
+          <Text style={[styles.placeAddress, { 
+            color: colorScheme === 'dark' ? '#B0B0B0' : colors.textSecondary 
+          }]} numberOfLines={1}>
+            {place.vicinity}
+          </Text>
+        </View>
+        
+        <View style={styles.placeDistance}>
+          <Text style={[styles.distanceText, { 
+            color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+          }]}>
+            {place.distance_km.toFixed(1)}km
+          </Text>
         </View>
       </View>
       
-      <View style={styles.contactActions}>
-        {service.email && (
-          <TouchableOpacity style={styles.contactActionButton} onPress={handleEmail}>
-            <Ionicons name="mail-outline" size={20} color={colors.primary} />
-            <Text style={styles.contactActionText}>{service.email}</Text>
-          </TouchableOpacity>
-        )}
-        {service.phone && (
-          <TouchableOpacity style={styles.contactActionButton} onPress={handleCall}>
-            <Ionicons name="call-outline" size={20} color={colors.primary} />
-            <Text style={styles.contactActionText}>{service.phone}</Text>
+      <View style={styles.placeActions}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.navigateButton]}
+          onPress={handleNavigate}
+        >
+          <Ionicons name="navigate" size={16} color="#FFFFFF" />
+          <Text style={styles.actionButtonText}>Navigate</Text>
+        </TouchableOpacity>
+        
+        {firstPhoneNumber && (
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.callActionButton]}
+            onPress={handleCall}
+          >
+            <Ionicons name="call" size={16} color="#FFFFFF" />
+            <Text style={styles.actionButtonText}>Call</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -73,19 +262,12 @@ function ContactServiceCard({ service }: { service: any }) {
   );
 }
 
-interface PhoneContact {
-  phone: string;
-  name: string;
-  type: string;
-}
-
 export default function AlertDetailsPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [alert, setAlert] = useState<SOSAlert | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-
+  const colorScheme = useColorScheme();
   const { token } = useAuthStore();
 
   const fetchAlertDetails = useCallback(async () => {
@@ -100,6 +282,8 @@ export default function AlertDetailsPage() {
       } else if (data) {
         console.log('SOS alert data received:', data);
         setAlert(data);
+        // Here you would also fetch the SOS response data from your backend
+        // For now, I'll simulate it based on the alert data
       } else {
         console.error('No data received for SOS alert');
         setError('Alert not found');
@@ -118,76 +302,36 @@ export default function AlertDetailsPage() {
     }
   }, [fetchAlertDetails, token]);
 
-  const getAllPhoneNumbers = (alert: SOSAlert): PhoneContact[] => {
-    const numbers: PhoneContact[] = [];
+  const handleCallContact = (contact: ServiceContact) => {
+    const firstPhoneNumber = getFirstPhoneNumber(contact.phone);
     
-    // Add contacted services
-    if (alert.contacted_services) {
-      alert.contacted_services.forEach(service => {
-        if (service.phone) {
-          numbers.push({
-            phone: service.phone,
-            name: service.name,
-            type: service.type
-          });
-        }
-      });
+    if (!firstPhoneNumber) {
+      Alert.alert('Error', 'No phone number available for this contact');
+      return;
     }
 
-    // Add fallback contacts
-    if (alert.fallback_contacts) {
-      alert.fallback_contacts.forEach(contact => {
-        if (contact.phone && !numbers.some(n => n.phone === contact.phone)) {
-          numbers.push({
-            phone: contact.phone,
-            name: contact.name,
-            type: contact.type
-          });
+    Alert.alert(
+      'Call Emergency Service',
+      `Do you want to call ${contact.name}?${hasMultiplePhoneNumbers(contact.phone) ? '\n(Will call the first number)' : ''}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Call', 
+          onPress: () => {
+            initiatePhoneCall(firstPhoneNumber);
+          }
         }
-      });
-    }
-
-    // Add unique phone numbers from nearby places
-    if (alert.google_places_data) {
-      alert.google_places_data.forEach(place => {
-        if (place.phone && !numbers.some(n => n.phone === place.phone)) {
-          numbers.push({
-            phone: place.phone,
-            name: place.name,
-            type: place.type
-          });
-        }
-      });
-    }
-
-    return numbers;
-  };
-
-  const parseEmergencyTypes = (emergencyType: string | string[]): string[] => {
-    if (Array.isArray(emergencyType)) {
-      return emergencyType;
-    }
-    if (typeof emergencyType === 'string') {
-      // Handle string representation of array like "['rescue', 'injured']"
-      try {
-        if (emergencyType.startsWith('[') && emergencyType.endsWith(']')) {
-          const parsed = emergencyType.slice(1, -1).split(',').map(item => 
-            item.trim().replace(/['"]/g, '')
-          );
-          return parsed.filter(item => item.length > 0);
-        }
-        return [emergencyType];
-      } catch {
-        return [emergencyType];
-      }
-    }
-    return [];
+      ]
+    );
   };
 
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colorScheme === 'dark' ? '#FFFFFF' : colors.text }]}>
+          Loading emergency details...
+        </Text>
       </View>
     );
   }
@@ -195,7 +339,14 @@ export default function AlertDetailsPage() {
   if (error) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>{error}</Text>
+        <Ionicons name="warning" size={64} color={colors.error} />
+        <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+        <TouchableOpacity 
+          style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          onPress={fetchAlertDetails}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -203,498 +354,499 @@ export default function AlertDetailsPage() {
   if (!alert) {
     return (
       <View style={[styles.container, styles.centerContent]}>
-        <Text style={styles.errorText}>No alert found</Text>
+        <Ionicons name="document-outline" size={64} color={colors.textSecondary} />
+        <Text style={[styles.errorText, { color: colors.textSecondary }]}>No alert found</Text>
       </View>
     );
   }
 
-  const phoneNumbers = getAllPhoneNumbers(alert);
-
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Status Banner */}
-      <View style={[styles.statusBanner, {
-        backgroundColor: alert.status === 'resolved' ? colors.success + '20' : 
-                        alert.status === 'sent' ? colors.warning + '20' : 
-                        colors.error + '20'
-      }]}>
-        <Ionicons 
-          name={alert.status === 'resolved' ? 'checkmark-circle' : 
-                alert.status === 'sent' ? 'time' : 'alert-circle'} 
-          size={24} 
-          color={alert.status === 'resolved' ? colors.success : 
-                 alert.status === 'sent' ? colors.warning : 
-                 colors.error} 
-        />
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[styles.statusText, {
-            color: alert.status === 'resolved' ? colors.success : 
-                   alert.status === 'sent' ? colors.warning : 
-                   colors.error
-          }]}>
-            {alert.status.toUpperCase()}
-          </Text>
-          <Text style={styles.timeText}>
-            Created: {new Date(alert.created_at).toLocaleString()}
-          </Text>
-          {alert.resolved_at && (
-            <Text style={styles.timeText}>
-              Resolved: {new Date(alert.resolved_at).toLocaleString()}
-            </Text>
-          )}
-        </View>
-      </View>
-
-      {/* Alert Information */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="information-circle-outline" size={20} color={colors.primary} /> Alert Information
-        </Text>
-        <View style={styles.alertInfoCard}>
-          <View style={styles.alertInfoRow}>
-            <Text style={styles.alertInfoLabel}>Alert ID</Text>
-            <Text style={styles.alertInfoValue}>#{alert.id}</Text>
-          </View>
-          <View style={styles.alertInfoRow}>
-            <Text style={styles.alertInfoLabel}>Status</Text>
-            <Text style={[styles.alertInfoValue, {
-              color: alert.status === 'resolved' ? colors.success : 
-                     alert.status === 'sent' ? colors.warning : 
-                     colors.error
-            }]}>
-              {alert.status.charAt(0).toUpperCase() + alert.status.slice(1)}
-            </Text>
-          </View>
-          <View style={[styles.alertInfoRow, { borderBottomWidth: 0 }]}>
-            <Text style={styles.alertInfoLabel}>Created</Text>
-            <Text style={styles.alertInfoValue}>
-              {new Date(alert.created_at).toLocaleDateString()} at {new Date(alert.created_at).toLocaleTimeString()}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Description */}
-      {Boolean(alert.description) && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="document-text-outline" size={20} color={colors.primary} /> Emergency Description
-          </Text>
-          <View style={styles.descriptionCard}>
-            <Text style={styles.descriptionText}>{alert.description}</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Contacted Services */}
-      {alert.contacted_services && alert.contacted_services.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="people-outline" size={20} color={colors.primary} /> Emergency Contacts
-          </Text>
-          {alert.contacted_services.map((service, index) => (
-            <ContactServiceCard key={`service-${index}`} service={service} />
-          ))}
-        </View>
-      )}
-
-      {/* Quick Call Section */}
-      {phoneNumbers.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="call-outline" size={20} color={colors.primary} /> Quick Call
-          </Text>
-          <View style={styles.callButtonsContainer}>
-            {phoneNumbers.map((item, index) => (
-              <QuickCallButton
-                key={index}
-                phone={item.phone}
-                name={item.name}
-                type={item.type}
-              />
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Emergency Types */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="warning-outline" size={20} color={colors.primary} /> Emergency Types
-        </Text>
-        <View style={styles.chipContainer}>
-          {alert.emergency_type && (
-            <>
-              <Text style={[styles.sectionTitle, { fontSize: 14, marginBottom: 8, color: colors.error }]}>
-                Primary Emergency:
-              </Text>
-              {parseEmergencyTypes(alert.emergency_type).map((type, index) => (
-                <View key={`primary-${index}`} style={[styles.chip, { backgroundColor: colors.error + '20' }]}>
-                  <Text style={[styles.chipText, { color: colors.error }]}>{type}</Text>
-                </View>
-              ))}
-              <Text style={[styles.sectionTitle, { fontSize: 14, marginBottom: 8, marginTop: 12, color: colors.textSecondary }]}>
-                Selected Services:
-              </Text>
-            </>
-          )}
-          {alert.selected_types && alert.selected_types.map((type, index) => (
-            <View key={`selected-${index}`} style={styles.chip}>
-              <Text style={styles.chipText}>{type}</Text>
+    <>
+      <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
+      <ScrollView 
+        style={[styles.container, { backgroundColor: colorScheme === 'dark' ? '#1A1A1A' : '#F5F5F5' }]}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header with Emergency Badge */}
+        <View style={[styles.emergencyHeader, {
+          backgroundColor: colorScheme === 'dark' ? '#FF5252' : '#F44336'
+        }]}>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.emergencyTitle}>EMERGENCY ALERT</Text>
+              <Text style={styles.alertId}>SOS-{alert.id}</Text>
             </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Location */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="location-outline" size={20} color={colors.primary} /> Emergency Location
-        </Text>
-        
-        {/* Map View */}
-        <View style={styles.mapContainer}>
-          <TouchableOpacity 
-            style={styles.mapPlaceholder}
-            onPress={() => Linking.openURL(`https://maps.google.com/?q=${alert.latitude},${alert.longitude}`)}
-          >
-            <Ionicons name="map-outline" size={48} color={colors.primary} />
-            <Text style={styles.mapPlaceholderText}>Tap to view on Google Maps</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.locationCard}>
-          <View style={styles.alertInfoRow}>
-            <Text style={styles.alertInfoLabel}>Latitude</Text>
-            <Text style={styles.alertInfoValue}>{alert.latitude.toFixed(6)}</Text>
-          </View>
-          <View style={[styles.alertInfoRow, { borderBottomWidth: 0 }]}>
-            <Text style={styles.alertInfoLabel}>Longitude</Text>
-            <Text style={styles.alertInfoValue}>{alert.longitude.toFixed(6)}</Text>
+            <StatusBadge status={alert.status} />
           </View>
           
-         
-        </View>
-      </View>
-
-      {/* Fallback Contacts */}
-      {alert.fallback_contacts && alert.fallback_contacts.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            <Ionicons name="call-outline" size={20} color={colors.primary} /> Fallback Contacts
-          </Text>
-          {alert.fallback_contacts.map((contact, index) => (
-            <ContactServiceCard key={`fallback-${index}`} service={contact} />
-          ))}
-        </View>
-      )}
-
-      {/* Nearby Places */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          <Ionicons name="business-outline" size={20} color={colors.primary} /> Nearby Emergency Services
-        </Text>
-        {alert.google_places_data && alert.google_places_data.length > 0 ? (
-          alert.google_places_data.map((place, index) => (
-            <View key={index} style={styles.placeCard}>
-              <View style={styles.placeHeader}>
-                <Text style={styles.placeName}>{place.name}</Text>
-                {place.rating && (
-                  <View style={styles.ratingContainer}>
-                    <Ionicons name="star" size={16} color="#FFD700" />
-                    <Text style={styles.ratingText}>{place.rating}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.placeDetails}>{place.vicinity}</Text>
-              <View style={styles.placeFooter}>
-                <Text style={styles.distanceText}>{place.distance_km.toFixed(2)} km away</Text>
-                <Text style={styles.typeTag}>{place.type}</Text>
-              </View>
-              {place.phone && (
-                <TouchableOpacity
-                  style={[styles.contactActionButton, { marginTop: 8 }]}
-                  onPress={() => Linking.openURL(`tel:${place.phone}`)}
-                >
-                  <Ionicons name="call" size={16} color={colors.primary} />
-                  <Text style={styles.contactActionText}>{place.phone}</Text>
-                </TouchableOpacity>
-              )}
+          <View style={styles.emergencyDetails}>
+            <View style={styles.emergencyDetailItem}>
+              <Ionicons name="time-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.emergencyDetailText}>
+                {new Date(alert.created_at).toLocaleString()}
+              </Text>
             </View>
-          ))
-        ) : (
-          <View style={styles.alertInfoCard}>
-            <Text style={[styles.alertInfoValue, { textAlign: 'center', color: colors.textSecondary }]}>
-              No nearby emergency services found for this location
+            <View style={styles.emergencyDetailItem}>
+              <Ionicons name="location-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.emergencyDetailText}>
+                {alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Description Card */}
+        {alert.description && (
+          <View style={[styles.card, {
+            backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#FFFFFF'
+          }]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="document-text" size={20} color={colors.primary} />
+              <Text style={[styles.cardTitle, { 
+                color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+              }]}>
+                Emergency Description
+              </Text>
+            </View>
+            <Text style={[styles.descriptionText, { 
+              color: colorScheme === 'dark' ? '#E0E0E0' : colors.text 
+            }]}>
+              {alert.description}
             </Text>
           </View>
         )}
-      </View>
-    </ScrollView>
+
+        {/* Emergency Types */}
+        <View style={[styles.card, {
+          backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#FFFFFF'
+        }]}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="warning" size={20} color={colors.error} />
+            <Text style={[styles.cardTitle, { 
+              color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+            }]}>
+              Emergency Classification
+            </Text>
+          </View>
+          <View style={styles.chipContainer}>
+            {alert.emergency_type && (
+              <EmergencyTypeChip type={alert.emergency_type.toString()} isPrimary />
+            )}
+            {alert.selected_types?.map((type, index) => (
+              <EmergencyTypeChip key={index} type={type} />
+            ))}
+          </View>
+        </View>
+
+
+        {/* Emergency Contacts */}
+        {alert.contacted_services && alert.contacted_services.length > 0 && (
+          <View style={[styles.card, {
+            backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#FFFFFF'
+          }]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="call" size={20} color={colors.success} />
+              <Text style={[styles.cardTitle, { 
+                color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+              }]}>
+                Emergency Contacts ({alert.contacted_services.length})
+              </Text>
+            </View>
+            <View style={styles.contactsList}>
+              {alert.contacted_services.map((service, index) => (
+                <ContactCard
+                  key={index}
+                  contact={{
+                    name: service.name,
+                    phone: service.phone,
+                    type: service.type
+                  }}
+                  onCall={() => handleCallContact({
+                    name: service.name,
+                    phone: service.phone,
+                    type: service.type
+                  })}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Nearby Emergency Services */}
+        {alert.google_places_data && alert.google_places_data.length > 0 && (
+          <View style={[styles.card, {
+            backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#FFFFFF'
+          }]}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="business" size={20} color={colors.info} />
+              <Text style={[styles.cardTitle, { 
+                color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+              }]}>
+                Nearby Services ({alert.google_places_data.length})
+              </Text>
+            </View>
+            <View style={styles.nearbyPlacesList}>
+              {alert.google_places_data.slice(0, 5).map((place, index) => (
+                <NearbyPlaceCard
+                  key={index}
+                  place={{
+                    place_id: place.place_id,
+                    name: place.name,
+                    address: place.address || place.vicinity,
+                    vicinity: place.vicinity,
+                    rating: place.rating || 0,
+                    user_ratings_total: 0,
+                    latitude: place.latitude,
+                    longitude: place.longitude,
+                    distance_km: place.distance_km,
+                    phone: place.phone,
+                    website: place.website,
+                    type: place.type,
+                    business_status: 'OPERATIONAL'
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Alert Timeline */}
+        <View style={[styles.card, {
+          backgroundColor: colorScheme === 'dark' ? '#2A2A2A' : '#FFFFFF'
+        }]}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="time" size={20} color={colors.textSecondary} />
+            <Text style={[styles.cardTitle, { 
+              color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+            }]}>
+              Alert Timeline
+            </Text>
+          </View>
+          <View style={styles.timeline}>
+            <View style={styles.timelineItem}>
+              <View style={[styles.timelineIcon, { backgroundColor: colors.error }]}>
+                <Ionicons name="warning" size={16} color="#FFFFFF" />
+              </View>
+              <View style={styles.timelineContent}>
+                <Text style={[styles.timelineTitle, { 
+                  color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+                }]}>
+                  Emergency Alert Created
+                </Text>
+                <Text style={[styles.timelineTime, { 
+                  color: colorScheme === 'dark' ? '#B0B0B0' : colors.textSecondary 
+                }]}>
+                  {new Date(alert.created_at).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+            
+            {alert.resolved_at && (
+              <View style={styles.timelineItem}>
+                <View style={[styles.timelineIcon, { backgroundColor: colors.success }]}>
+                  <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                </View>
+                <View style={styles.timelineContent}>
+                  <Text style={[styles.timelineTitle, { 
+                    color: colorScheme === 'dark' ? '#FFFFFF' : colors.text 
+                  }]}>
+                    Emergency Resolved
+                  </Text>
+                  <Text style={[styles.timelineTime, { 
+                    color: colorScheme === 'dark' ? '#B0B0B0' : colors.textSecondary 
+                  }]}>
+                    {new Date(alert.resolved_at).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F5F5F5',
   },
   contentContainer: {
-    padding: 16,
+    paddingBottom: 24,
   },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  statusBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
-  },
-  statusText: {
-    fontSize: 16,
-    fontWeight: '600',
     flex: 1,
   },
-  timeText: {
-    fontSize: 14,
-    color: colors.textSecondary,
+  loadingText: {
+    fontSize: 16,
+    marginTop: 16,
+    textAlign: 'center',
   },
-  section: {
-    marginBottom: 24,
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginVertical: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
-  callButtonsContainer: {
-    gap: 8,
+  emergencyHeader: {
+    padding: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
-  callButton: {
+  headerContent: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: colors.card,
-    borderRadius: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  emergencyTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  alertId: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  emergencyDetails: {
+    gap: 8,
+  },
+  emergencyDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  emergencyDetailText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    opacity: 0.9,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+    borderWidth: 1,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  card: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    padding: 16,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 3,
+        elevation: 4,
       },
     }),
   },
-  callButtonContent: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 16,
     gap: 12,
   },
-  callButtonText: {
-    flex: 1,
-  },
-  callButtonTitle: {
-    fontSize: 16,
+  cardTitle: {
+    fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
   },
-  callButtonSubtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
+  descriptionText: {
+    fontSize: 16,
+    lineHeight: 24,
   },
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
-    backgroundColor: colors.primary + '20',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  chipText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  locationCard: {
-    backgroundColor: colors.card,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  locationText: {
-    fontSize: 16,
-    color: colors.text,
-    fontWeight: '500',
-  },
-  placeCard: {
-    backgroundColor: colors.card,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  placeHeader: {
+  emergencyChip: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    borderWidth: 1,
   },
-  placeName: {
+  emergencyChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  quickActionText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
-    flex: 1,
   },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: colors.text,
-  },
-  placeDetails: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 8,
-  },
-  placeFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  distanceText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  typeTag: {
-    fontSize: 12,
-    color: colors.primary,
-    backgroundColor: colors.primary + '20',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  descriptionCard: {
-    backgroundColor: colors.card,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  descriptionText: {
-    color: colors.text,
-    fontSize: 15,
-    lineHeight: 20,
+  contactsList: {
+    gap: 12,
   },
   contactCard: {
-    backgroundColor: colors.card,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  contactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+  },
+  contactIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   contactInfo: {
-    marginLeft: 12,
     flex: 1,
   },
   contactName: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text,
+    marginBottom: 4,
   },
   contactType: {
     fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
-  contactActions: {
-    gap: 8,
-  },
-  contactActionButton: {
-    flexDirection: 'row',
+  callButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 8,
-    backgroundColor: colors.primary + '10',
-    borderRadius: 8,
-    gap: 8,
   },
-  contactActionText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '500',
-    flex: 1,
+  nearbyPlacesList: {
+    gap: 12,
   },
-  alertInfoCard: {
-    backgroundColor: colors.card,
+  placeCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
   },
-  alertInfoRow: {
+  placeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
-  alertInfoLabel: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  alertInfoValue: {
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: '600',
+  placeInfo: {
     flex: 1,
-    textAlign: 'right',
+    marginRight: 12,
   },
-  mapContainer: {
-    height: 200,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.card,
-  },
-  mapPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.primary + '10',
-  },
-  mapPlaceholderText: {
-    color: colors.primary,
+  placeName: {
     fontSize: 16,
     fontWeight: '600',
-    marginTop: 8,
+    marginBottom: 4,
+  },
+  placeAddress: {
+    fontSize: 14,
+  },
+  placeDistance: {
+    alignItems: 'flex-end',
+  },
+  distanceText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  placeActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  navigateButton: {
+    backgroundColor: colors.primary,
+  },
+  callActionButton: {
+    backgroundColor: colors.success,
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  timeline: {
+    gap: 16,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  timelineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  timelineTime: {
+    fontSize: 14,
   },
 });
